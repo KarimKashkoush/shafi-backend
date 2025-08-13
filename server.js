@@ -11,6 +11,7 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 const PORT = process.env.PORT || 5000;
 const allowedOrigins = [
       "https://shafi-d5v1x5yu5-karimkashkoushs-projects.vercel.app",
+      "https://shafi-gilt.vercel.app",
 ];
 
 app.use(cors({
