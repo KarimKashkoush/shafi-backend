@@ -1,0 +1,52 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Users {
+  id              String    @id @default(uuid())
+  firstName       String    @map("first_name")
+  fullName        String    @map("full_name")
+  email           String?   @unique
+  phoneNumber     String    @unique @map("phone_number")
+  password        String    @map("password")
+  pin             String?   @db.Char(4)
+  role            String
+  gender          String
+  blood           String?
+  emergencyNumber String?   @map("emergency_number")
+  address         String?
+  birthDate       DateTime? @map("birth_date")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  reports         Reports[]
+}
+
+model Reports {
+  id                 Int      @id @default(autoincrement())
+  userId             String
+  reportText         String?
+  chronicDisease     String?
+  chronicDiseaseName String?
+  medications        Json?
+  radiology          Json?
+  labTests           Json?
+  createdAt          DateTime @default(now())
+
+  user    Users    @relation(fields: [userId], references: [id])
+  results Result[] 
+  @@map("Reports")
+}
+
+model Result {
+  id       Int     @id @default(autoincrement())
+  name     String
+  notes    String?
+  result   String?
+  reportId Int
+  report   Reports @relation(fields: [reportId], references: [id])
+}
