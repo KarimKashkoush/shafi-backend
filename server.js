@@ -10,9 +10,9 @@ app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 const PORT = process.env.PORT || 5000;
 app.use(cors({
-      origin: process.env.CLIENT_URL || PORT,
+      origin: "*",
       methods: ["GET", "POST", "PUT", "DELETE"],
-      credentials: true
+      credentials: false
 }));
 
 app.use(express.json());
