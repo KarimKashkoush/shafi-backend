@@ -13,6 +13,7 @@ const PORT = process.env.PORT || 5000;
 const allowedOrigins = [
       "https://shafi-d5v1x5yu5-karimkashkoushs-projects.vercel.app",
       "https://shafi-gilt.vercel.app",
+      "https://shafi-front-end.vercel.app",
       "http://localhost:5173"
 ];
 
