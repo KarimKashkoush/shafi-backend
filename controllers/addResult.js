@@ -16,7 +16,7 @@ async function addResult(req, res) {
       }
 
       try {
-            const { rows } = await pool.query(`SELECT * FROM "Reports" WHERE id = $1`, [reportId]);
+            const { rows } = await pool.query(`SELECT * FROM "reports" WHERE id = $1`, [reportId]);
             if (!rows[0]) return res.status(404).json({ message: "التقرير غير موجود" });
 
             const report = rows[0];
@@ -50,7 +50,7 @@ async function addResult(req, res) {
             arr[idx].result = newResult;
 
             // إحنا بنخزن كـ JSON string علشان متأكدين من التوافق مع عمود json/jsonb
-            const updateQuery = `UPDATE "Reports" SET "${type}" = $1 WHERE id = $2 RETURNING *`;
+            const updateQuery = `UPDATE "reports" SET "${type}" = $1 WHERE id = $2 RETURNING *`;
             const updateValues = [JSON.stringify(arr), reportId];
             const { rows: updatedRows } = await pool.query(updateQuery, updateValues);
 

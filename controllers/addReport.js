@@ -26,11 +26,11 @@ async function addReport(req, res) {
     }));
 
     const query = `
-      INSERT INTO "Reports"
-      ("userId", "reportText", "chronicDisease", "chronicDiseaseName", "medications", "radiology", "labTests", "createdAt")
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      RETURNING *
-    `;
+  INSERT INTO reports
+  (user_id, report_text, chronic_disease, chronic_disease_name, medications, radiology, lab_tests, created_at)
+  VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+  RETURNING *
+`;
 
     const values = [
       userId,
@@ -42,6 +42,7 @@ async function addReport(req, res) {
       labTests ? JSON.stringify(labTestsWithResult) : null,
       createdAt || new Date().toISOString()
     ];
+
 
     const result = await pool.query(query, values);
 

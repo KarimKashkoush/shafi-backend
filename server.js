@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
 const path = require("path");
+const pool = require('./db'); // ✅ ربط PostgreSQL
 const authRoutes = require('./routes/routes');
 
 const app = express();
@@ -28,9 +29,16 @@ app.use(cors({
       methods: ["GET", "POST", "PUT", "DELETE"]
 }));
 
-
 app.use(express.json());
 app.use('/', authRoutes);
 
+// ✅ اختبار الاتصال بقاعدة البيانات
+pool.query('SELECT NOW()', (err, result) => {
+      if (err) {
+            console.error('❌ Database connection error:', err);
+      } else {
+            console.log('📦 Database connected ✅', result.rows[0]);
+      }
+});
 
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));

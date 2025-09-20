@@ -2,7 +2,7 @@ const pool = require("../db");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-const JWT_SECRET =  process.env.JWT_SECRET; 
+const JWT_SECRET = process.env.JWT_SECRET;
 
 async function login(req, res) {
       const { email, phoneNumber, password } = req.body;
@@ -15,7 +15,7 @@ async function login(req, res) {
 
       try {
             const userQuery = await pool.query(
-                  'SELECT * FROM "Users" WHERE email = $1 OR phone_number = $1',
+                  'SELECT * FROM "users" WHERE email = $1 OR phone_number = $1',
                   [loginValue]
             );
 
@@ -33,12 +33,12 @@ async function login(req, res) {
             const token = jwt.sign(
                   { userId: user.id, role: user.role },
                   JWT_SECRET,
-                  { expiresIn: '7d' } 
+                  { expiresIn: '7d' }
             );
 
             res.status(200).json({
                   message: 'success',
-                  token, 
+                  token,
                   user: {
                         id: user.id,
                         firstName: user.first_name,
