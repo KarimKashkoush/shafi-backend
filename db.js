@@ -15,11 +15,11 @@
 const { Pool } = require('pg');
 
 const pool = new Pool({
-      user: process.env.DB_USER,       // من المتغيرات البيئية على Render
-      host: process.env.DB_HOST,       // من المتغيرات البيئية على Render
-      database: process.env.DB_NAME,   // من المتغيرات البيئية على Render
-      password: process.env.DB_PASS,   // من المتغيرات البيئية على Render
-      port: process.env.DB_PORT,       // عادة 5432
+      user: process.env.DB_USER,
+      host: process.env.DB_HOST,
+      database: process.env.DB_NAME,
+      password: process.env.DB_PASS,
+      port: process.env.DB_PORT,
 });
 
 module.exports = pool;
