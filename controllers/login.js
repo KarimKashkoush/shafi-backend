@@ -15,7 +15,7 @@ async function login(req, res) {
 
       try {
             const userQuery = await pool.query(
-                  'SELECT * FROM "users" WHERE email = $1 OR phone_number = $1',
+                  'SELECT * FROM "users" WHERE email = $1 OR "phoneNumber" = $1',
                   [loginValue]
             );
 
@@ -41,10 +41,10 @@ async function login(req, res) {
                   token,
                   user: {
                         id: user.id,
-                        firstName: user.first_name,
-                        fullName: user.full_name,
+                        firstName: user.firstName,
+                        fullName: user.fullName,
                         email: user.email,
-                        phoneNumber: user.phone_number,
+                        phoneNumber: user.phoneNumber, 
                         role: user.role,
                         gender: user.gender
                   }

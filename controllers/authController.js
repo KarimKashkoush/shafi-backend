@@ -8,7 +8,7 @@ async function registerUser(req, res) {
       try {
             // تحقق من وجود مستخدم
             const existingUser = await pool.query(
-                  'SELECT * FROM users WHERE email = $1 OR phone_number = $2',
+                  'SELECT * FROM users WHERE email = $1 OR phoneNumber = $2',
                   [email || null, phoneNumber || null]
             );
 
@@ -19,9 +19,9 @@ async function registerUser(req, res) {
             const hashedPassword = await bcrypt.hash(password, 10);
 
             const newUser = await pool.query(
-                  `INSERT INTO users (first_name, full_name, email, phone_number, password, pin, role, gender)
+                  `INSERT INTO users (firstName, fullName, email, phoneNumber, password, pin, role, gender)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, first_name, full_name, email, phone_number, role, gender`,
+       RETURNING id, firstName, fullName, email, phoneNumber, role, gender`,
                   [firstName, fullName, email, phoneNumber, hashedPassword, pin, role, gender]
             );
 
@@ -57,7 +57,7 @@ async function getUser(req, res) {
             const user = userResult.rows[0];
 
             const reportsResult = await pool.query(
-                  'SELECT * FROM reports WHERE user_id = $1 ORDER BY created_at DESC',
+                  'SELECT * FROM reports WHERE "userId" = $1 ORDER BY "createdAt" DESC',
                   [id]
             );
 
@@ -71,24 +71,78 @@ async function getUser(req, res) {
 // Update User
 async function updateUser(req, res) {
       const { id } = req.params;
-      const { firstName, fullName, phoneNumber, email, gender, blood, emergencyNumber, address, birthDate } = req.body;
+      const fields = req.body;
+
+      const columnMap = {
+            firstname: "firstName",
+            fullname: "fullName",
+            phonenumber: "phoneNumber",
+            email: "email",
+            gender: "gender",
+            blood: "blood",
+            emergencynumber: "emergencyNumber",
+            address: "address",
+            birthdate: "birthDate"
+      };
 
       try {
-            const updateResult = await pool.query(
-                  `UPDATE users SET
-         first_name = $1,
-         full_name = $2,
-         phone_number = $3,
-         email = $4,
-         gender = $5,
-         blood = $6,
-         emergency_number = $7,
-         address = $8,
-         birth_date = $9
-       WHERE id = $10
-       RETURNING id, first_name, full_name, phone_number, email, gender, blood, emergency_number, address, birth_date`,
-                  [firstName, fullName, phoneNumber, email, gender, blood, emergencyNumber, address, birthDate, id]
-            );
+            if (!fields || Object.keys(fields).length === 0) {
+                  return res.status(400).json({ message: "مفيش بيانات لتحديثها" });
+            }
+
+            // التحقق من الحقول الإلزامية
+            if (
+                  ("firstname" in fields && fields.firstname === "") ||
+                  ("phonenumber" in fields && fields.phonenumber === "") ||
+                  ("email" in fields && fields.email === "")
+            ) {
+                  return res
+                        .status(400)
+                        .json({ message: "الاسم ورقم الهاتف والايميل لازم يكونوا قيم مش فاضية" });
+            }
+
+            const setClauses = [];
+            const values = [];
+            let index = 1;
+
+            for (const [key, value] of Object.entries(fields)) {
+                  const column = columnMap[key.toLowerCase()];
+                  if (column) {
+                        // لو القيمة فاضية نخليها NULL
+                        const safeValue = value === "" ? null : value;
+
+                        setClauses.push(`"${column}" = $${index}`);
+                        values.push(safeValue);
+                        index++;
+                  }
+            }
+
+            if (setClauses.length === 0) {
+                  return res
+                        .status(400)
+                        .json({ message: "مفيش بيانات متوافقة للتحديث" });
+            }
+
+            values.push(id);
+
+            const query = `
+      UPDATE users
+      SET ${setClauses.join(", ")}
+      WHERE id = $${index}
+      RETURNING 
+        id,
+        "firstName",
+        "fullName",
+        "phoneNumber",
+        email,
+        gender,
+        blood,
+        "emergencyNumber",
+        address,
+        "birthDate"
+    `;
+
+            const updateResult = await pool.query(query, values);
 
             if (updateResult.rows.length === 0) {
                   return res.status(404).json({ message: "المستخدم غير موجود" });

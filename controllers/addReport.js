@@ -13,24 +13,25 @@ async function addReport(req, res) {
   } = req.body;
 
   try {
-    // ✅ تجهيز radiology مع result=null
+    // ✅ radiology مع result=null
     const radiologyWithResult = radiology?.map(item => ({
       ...item,
       result: null
     }));
 
-    // ✅ تجهيز labTests مع result=null
+    // ✅ labTests مع result=null
     const labTestsWithResult = labTests?.map(item => ({
       ...item,
       result: null
     }));
 
-    const query = `
+const query = `
   INSERT INTO reports
-  (user_id, report_text, chronic_disease, chronic_disease_name, medications, radiology, lab_tests, created_at)
+  (userId, reportText, chronicDisease, chronicDiseaseName, medications, radiology, labTests, createdAt)
   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
   RETURNING *
 `;
+
 
     const values = [
       userId,
@@ -43,12 +44,25 @@ async function addReport(req, res) {
       createdAt || new Date().toISOString()
     ];
 
-
     const result = await pool.query(query, values);
+
+    // ✅ تحويل الـ keys من snake_case → camelCase
+    const row = result.rows[0];
+    const formattedReport = {
+      id: row.id,
+      userId: row.user_id,
+      reportText: row.report_text,
+      chronicDisease: row.chronic_disease,
+      chronicDiseaseName: row.chronic_disease_name,
+      medications: row.medications,
+      radiology: row.radiology,
+      labTests: row.lab_tests,
+      createdAt: row.created_at
+    };
 
     res.status(201).json({
       message: "success",
-      report: result.rows[0]
+      report: formattedReport
     });
 
   } catch (error) {
