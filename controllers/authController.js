@@ -92,9 +92,7 @@ async function updateUser(req, res) {
 
             // التحقق من الحقول الإلزامية
             if (
-                  ("firstname" in fields && fields.firstname === "") ||
-                  ("phonenumber" in fields && fields.phonenumber === "") ||
-                  ("email" in fields && fields.email === "")
+                  ("firstname" in fields && fields.firstname === "") 
             ) {
                   return res
                         .status(400)
