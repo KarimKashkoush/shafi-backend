@@ -25,9 +25,9 @@ async function addReport(req, res) {
       result: null
     }));
 
-const query = `
+    const query = `
   INSERT INTO reports
-  (userId, reportText, chronicDisease, chronicDiseaseName, medications, radiology, labTests, createdAt)
+  ("userId", "reportText", "chronicDisease", "chronicDiseaseName", "medications", "radiology", "labTests", "createdAt")
   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
   RETURNING *
 `;

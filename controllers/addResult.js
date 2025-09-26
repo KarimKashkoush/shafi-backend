@@ -1,9 +1,9 @@
-// controllers/addResult.js
 const pool = require('../db');
+const { uploadFileToS3 } = require('../middleware/s3');
 
 async function addResult(req, res) {
       const reportId = parseInt(req.params.reportId || req.body.reportId, 10);
-      const { type, index } = req.body; // type = "radiology" or "labTests", index = رقم العنصر
+      const { type, index } = req.body;
 
       if (!reportId) return res.status(400).json({ message: "reportId مطلوب" });
       if (!type || !['radiology', 'labTests'].includes(type)) {
@@ -11,9 +11,7 @@ async function addResult(req, res) {
       }
       const idx = parseInt(index, 10);
       if (Number.isNaN(idx)) return res.status(400).json({ message: "index مطلوب كرقم" });
-      if (!req.files || req.files.length === 0) {
-            return res.status(400).json({ message: "مطلوب ملف واحد على الأقل" });
-      }
+      if (!req.files || req.files.length === 0) return res.status(400).json({ message: "مطلوب ملف واحد على الأقل" });
 
       try {
             const { rows } = await pool.query(`SELECT * FROM "reports" WHERE id = $1`, [reportId]);
@@ -21,35 +19,33 @@ async function addResult(req, res) {
 
             const report = rows[0];
 
-            // اقرأ المصفوفة المطلوبة بطريقة آمنة (string أو object)
             let arr = report[type];
             if (typeof arr === 'string') {
                   try { arr = JSON.parse(arr); } catch (e) { arr = []; }
             }
             if (!Array.isArray(arr)) arr = [];
 
-            if (idx < 0 || idx >= arr.length) {
-                  return res.status(400).json({ message: "index خارج نطاق المصفوفة" });
+            if (idx < 0 || idx >= arr.length) return res.status(400).json({ message: "index خارج نطاق المصفوفة" });
+
+            // رفع الملفات على S3
+            const fileUrls = [];
+            for (const file of req.files) {
+                  const url = await uploadFileToS3(file);
+                  fileUrls.push(url);
             }
 
-            // ملفات مخزنة في uploads => نبني المسارات اللي هتتحخزن في DB
-            const fileUrls = req.files.map(f => `/uploads/${f.filename}`);
-
-            // ندمج/نستبدل الـ result في العنصر المستهدف
+            // تحديث النتائج في المصفوفة
             const existing = arr[idx].result;
             let newResult;
             if (existing) {
-                  // لو فيه نتيجة سابقة ندمجها مع الحالية
                   if (Array.isArray(existing)) newResult = [...existing, ...fileUrls];
                   else newResult = [existing, ...fileUrls];
             } else {
-                  // لو مفيش نتيجة قبل كده: لو ملف واحد خليه string غير كده خلي array
                   newResult = fileUrls.length === 1 ? fileUrls[0] : fileUrls;
             }
 
             arr[idx].result = newResult;
 
-            // إحنا بنخزن كـ JSON string علشان متأكدين من التوافق مع عمود json/jsonb
             const updateQuery = `UPDATE "reports" SET "${type}" = $1 WHERE id = $2 RETURNING *`;
             const updateValues = [JSON.stringify(arr), reportId];
             const { rows: updatedRows } = await pool.query(updateQuery, updateValues);
