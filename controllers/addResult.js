@@ -27,14 +27,12 @@ async function addResult(req, res) {
 
             if (idx < 0 || idx >= arr.length) return res.status(400).json({ message: "index خارج نطاق المصفوفة" });
 
-            // رفع الملفات على S3
             const fileUrls = [];
             for (const file of req.files) {
                   const url = await uploadFileToS3(file);
                   fileUrls.push(url);
             }
 
-            // تحديث النتائج في المصفوفة
             const existing = arr[idx].result;
             let newResult;
             if (existing) {

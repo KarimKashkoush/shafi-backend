@@ -16,6 +16,7 @@ async function uploadFileToS3(file) {
                   Bucket: process.env.AWS_BUCKET_NAME,
                   Key: `results/${Date.now()}-${file.originalname}`,
                   Body: file.buffer, // هياخد الملف من multer buffer
+                  ACL: "public-read" 
             },
       });
 
