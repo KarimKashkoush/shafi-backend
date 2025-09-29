@@ -10,18 +10,24 @@ const s3Client = new S3Client({
 });
 
 async function uploadFileToS3(file) {
+      // إزالة المسافات + تحويلها لـ "_"
+      const safeFileName = file.originalname.replace(/\s+/g, "_");
+      const key = `results/${Date.now()}-${safeFileName}`;
+
       const parallelUpload = new Upload({
             client: s3Client,
             params: {
                   Bucket: process.env.AWS_BUCKET_NAME,
-                  Key: `results/${Date.now()}-${file.originalname}`,
-                  Body: file.buffer, // هياخد الملف من multer buffer
-                  ACL: "public-read" 
+                  Key: key,
+                  Body: file.buffer,
+                  ContentType: file.mimetype,
             },
       });
 
-      const result = await parallelUpload.done();
-      return `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${parallelUpload.params.Key}`;
+      await parallelUpload.done();
+
+      // رجع اللينك المباشر مش الـ key
+      return `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
 }
 
-module.exports = { uploadFileToS3 };
+module.exports = { uploadFileToS3, s3Client };

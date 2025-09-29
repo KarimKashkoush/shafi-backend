@@ -4,6 +4,7 @@ const { registerUser, getUser, getAllUsers, updateUser } = require('../controlle
 const { login } = require('../controllers/login');
 const { addReport } = require('../controllers/addReport');
 const { addResult } = require('../controllers/addResult');
+const { getFile } = require('../controllers/getFile'); // 👈 أضفنا الكنترولر الجديد
 const multer = require('multer');
 
 router.post('/register', registerUser);
@@ -24,8 +25,11 @@ const upload = multer({
 
 router.post("/reports/:reportId/add-result", upload.array("resultFiles", 5), addResult);
 
-router.get('/user/:id', getUser)
-router.get('/allUsers', getAllUsers)
+// ✅ API لعرض الملف برابط مؤقت
+router.get("/files/:key", getFile);
+
+router.get('/user/:id', getUser);
+router.get('/allUsers', getAllUsers);
 
 router.put('/user/:id', updateUser);
 
