@@ -40,7 +40,7 @@ router.put("/user/:id", updateUser);
 router.post("/addReport", addReport);
 
 // Results
-router.post("/reports/:reportId/add-result", upload.array("resultFiles", 5), addResult);
+router.post("/reports/:reportId/addResult", upload.array("resultFiles", 5), addResult);
 router.post("/staffAddResult", upload.array("files", 5), staffAddResult);
 
 // Files (عرض الملفات برابط مؤقت من S3)
@@ -48,7 +48,7 @@ router.get("/files/:key", getFile);
 
 
 router.post("/appointments", addAppointment);
-router.post("/appointments/:id/add-result", upload.array("files", 5), addResultToAppointment);
+router.post("/appointments/:id/addResultAppointment", upload.array("files", 5), addResultToAppointment);
 router.get("/appointments", getAppointmentsWithResults);
 
 module.exports = router;
