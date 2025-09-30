@@ -10,7 +10,6 @@ const s3Client = new S3Client({
 });
 
 async function uploadFileToS3(file) {
-      // إزالة المسافات + تحويلها لـ "_"
       const safeFileName = file.originalname.replace(/\s+/g, "_");
       const key = `results/${Date.now()}-${safeFileName}`;
 
