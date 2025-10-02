@@ -9,7 +9,7 @@ const { staffAddResult } = require("../controllers/stafResult");
 const { getFile } = require("../controllers/getFile");
 
 const multer = require("multer");
-const { addAppointment, addResultToAppointment, getAppointmentsWithResults } = require("../controllers/addAppointment");
+const { addAppointment, addResultToAppointment, getAppointmentsWithResults, deleteAppointment, updateNationalId } = require("../controllers/addAppointment");
 
 // Multer لتخزين الملفات في الذاكرة
 const storage = multer.memoryStorage();
@@ -42,6 +42,9 @@ router.post("/addReport", addReport);
 // Results
 router.post("/reports/:reportId/addResult", upload.array("resultFiles", 5), addResult);
 router.post("/staffAddResult", upload.array("files", 5), staffAddResult);
+router.delete("/appointments/:id", deleteAppointment);
+router.put("/appointments/:id/nationalId", updateNationalId);
+
 
 // Files (عرض الملفات برابط مؤقت من S3)
 router.get("/files/:key", getFile);

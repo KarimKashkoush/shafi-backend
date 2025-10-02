@@ -69,8 +69,66 @@ const getAppointmentsWithResults = async (req, res) => {
       }
 };
 
+// ✅ 4. حذف حجز بالـ id
+const deleteAppointment = async (req, res) => {
+      try {
+            const { id } = req.params;
+
+            // الأول نمسح أي نتيجة مرتبطة بالحجز
+            await pool.query(`DELETE FROM result WHERE "appointmentId" = $1`, [id]);
+
+            // بعدين نمسح الحجز نفسه
+            const query = `DELETE FROM appointments WHERE id = $1 RETURNING *`;
+            const result = await pool.query(query, [id]);
+
+            if (result.rowCount === 0) {
+                  return res.status(404).json({ message: "الحجز غير موجود" });
+            }
+
+            res.json({ message: "تم حذف الحجز بنجاح", data: result.rows[0] });
+      } catch (error) {
+            console.error("❌ Error in deleteAppointment:", error);
+            res.status(500).json({ message: "error", error: error.message });
+      }
+};
+
+// ✅ 5. تعديل أو إضافة الرقم القومي لحجز
+const updateNationalId = async (req, res) => {
+      try {
+            const { id } = req.params; // appointmentId
+            const { nationalId } = req.body;
+
+            if (!nationalId) {
+                  return res.status(400).json({ message: "الرقم القومي مطلوب" });
+            }
+
+            const query = `
+            UPDATE appointments
+            SET "nationalId" = $1
+            WHERE id = $2
+            RETURNING *;
+        `;
+
+            const values = [nationalId, id];
+            const result = await pool.query(query, values);
+
+            if (result.rowCount === 0) {
+                  return res.status(404).json({ message: "الحجز غير موجود" });
+            }
+
+            res.json({ message: "تم تحديث الرقم القومي بنجاح", data: result.rows[0] });
+      } catch (error) {
+            console.error("❌ Error in updateNationalId:", error);
+            res.status(500).json({ message: "error", error: error.message });
+      }
+};
+
+
+
 module.exports = {
       addAppointment,
       addResultToAppointment,
-      getAppointmentsWithResults
+      getAppointmentsWithResults,
+      deleteAppointment,
+      updateNationalId
 };
