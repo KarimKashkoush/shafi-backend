@@ -27,6 +27,20 @@ const addResultToAppointment = async (req, res) => {
             const { id } = req.params; // appointmentId
             const { userId } = req.body;
 
+            // هات بيانات الحجز الأول
+            const apptRes = await pool.query(
+                  `SELECT "caseName", "phone", "nationalId", "testName"
+       FROM appointments WHERE id = $1`,
+                  [id]
+            );
+
+            if (apptRes.rowCount === 0) {
+                  return res.status(404).json({ message: "الحجز مش موجود" });
+            }
+
+            const { caseName, phone, nationalId, testName } = apptRes.rows[0];
+
+            // رفع الملفات
             let uploadedFiles = [];
             if (req.files && req.files.length > 0) {
                   for (const file of req.files) {
@@ -35,12 +49,13 @@ const addResultToAppointment = async (req, res) => {
                   }
             }
 
+            // إدخال النتيجة مرتبطة بالحجز
             const query = `
-            INSERT INTO result ("appointmentId", "userId", "files")
-            VALUES ($1, $2, $3)
-            RETURNING *`;
+      INSERT INTO result ("appointmentId", "userId", "caseName", "phone", "nationalId", "testName", "files")
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING *`;
 
-            const values = [id, userId, uploadedFiles];
+            const values = [id, userId, caseName, phone, nationalId, testName, uploadedFiles];
             const resultInsert = await pool.query(query, values);
 
             res.json({ message: "success", data: resultInsert.rows[0] });
@@ -49,6 +64,7 @@ const addResultToAppointment = async (req, res) => {
             res.status(500).json({ message: "error", error: error.message });
       }
 };
+
 
 // ✅ 3. عرض كل الحجوزات مع النتائج
 const getAppointmentsWithResults = async (req, res) => {
@@ -116,7 +132,7 @@ const updateNationalId = async (req, res) => {
                   return res.status(404).json({ message: "الحجز غير موجود" });
             }
 
-            res.json({ message: "تم تحديث الرقم القومي بنجاح", data: result.rows[0] });
+            res.json({ message: "success", data: result.rows[0] });
       } catch (error) {
             console.error("❌ Error in updateNationalId:", error);
             res.status(500).json({ message: "error", error: error.message });
