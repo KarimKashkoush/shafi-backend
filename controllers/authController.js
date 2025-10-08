@@ -8,7 +8,7 @@ async function registerUser(req, res) {
       try {
             // تحقق من وجود مستخدم
             const existingUser = await pool.query(
-                  'SELECT * FROM users WHERE email = $1 OR phoneNumber = $2',
+                  'SELECT * FROM users WHERE email = $1 OR "phoneNumber" = $2',
                   [email || null, phoneNumber || null]
             );
 
@@ -19,9 +19,9 @@ async function registerUser(req, res) {
             const hashedPassword = await bcrypt.hash(password, 10);
 
             const newUser = await pool.query(
-                  `INSERT INTO users (firstName, fullName, email, phoneNumber, password, pin, role, gender)
+                  `INSERT INTO users ("firstName", "fullName", email, "phoneNumber", password, pin, role, gender)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-       RETURNING id, firstName, fullName, email, phoneNumber, role, gender`,
+       RETURNING id, "firstName", "fullName", email, "phoneNumber", role, gender`,
                   [firstName, fullName, email, phoneNumber, hashedPassword, pin, role, gender]
             );
 
@@ -31,6 +31,7 @@ async function registerUser(req, res) {
             res.status(500).json({ message: 'error', error: err.message });
       }
 }
+
 
 // Get All Users
 async function getAllUsers(req, res) {
@@ -92,7 +93,7 @@ async function updateUser(req, res) {
 
             // التحقق من الحقول الإلزامية
             if (
-                  ("firstname" in fields && fields.firstname === "") 
+                  ("firstname" in fields && fields.firstname === "")
             ) {
                   return res
                         .status(400)
