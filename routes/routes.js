@@ -37,7 +37,7 @@ router.post("/login", login);
 
 // ✅ Users
 router.get("/user/:id", authenticateToken, requireSelfOrRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), getUser);
-router.get("/allUsers", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), getAllUsers);
+router.get("/allUsers", getAllUsers);
 router.put("/user/:id", authenticateToken, requireSelfOrRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), updateUser);
 
 // ✅ Appointments
