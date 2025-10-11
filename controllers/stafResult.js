@@ -4,10 +4,11 @@ const { uploadFileToS3 } = require("../middleware/s3");
 const staffAddResult = async (req, res) => {
       const client = await pool.connect();
       try {
-            const { appointmentId, userId } = req.body;
+            const { appointmentId, userId, caseName, phone, nationalId, testName } = req.body;
 
-            if (!appointmentId) {
-                  return res.status(400).json({ message: "appointmentId مطلوب" });
+            // التحقق من المدخلات الأساسية
+            if (!userId) {
+                  return res.status(400).json({ message: "userId مطلوب" });
             }
 
             // رفع الملفات إلى S3
@@ -19,23 +20,38 @@ const staffAddResult = async (req, res) => {
                   }
             }
 
-            // إدخال النتيجة وربطها بالحجز
-            const query = `
-      INSERT INTO result ("appointmentId", "userId", "files", "createdAt")
-      VALUES ($1, $2, $3, $4)
-      RETURNING *;
-    `;
+            // ✅ لو جاية من صفحة "الحالات" ومعاها appointmentId
+            if (appointmentId) {
+                  const query = `
+                        INSERT INTO result ("appointmentId", "userId", "files", "createdAt")
+                        VALUES ($1, $2, $3, $4)
+                        RETURNING *;
+                  `;
+                  const values = [appointmentId, userId, JSON.stringify(uploadedFiles), new Date().toISOString()];
+                  const result = await client.query(query, values);
+                  return res.json({ message: "success", data: result.rows[0] });
+            }
 
+            // ✅ لو جاية من صفحة "إضافة نتيجة جديدة" StafAddResult (من غير appointment)
+            const query = `
+                  INSERT INTO result ("userId", "caseName", "phone", "nationalId", "testName", "files", "createdAt")
+                  VALUES ($1, $2, $3, $4, $5, $6, $7)
+                  RETURNING *;
+            `;
             const values = [
-                  appointmentId,
                   userId,
-                  JSON.stringify(uploadedFiles),
+                  caseName || null,
+                  phone || null,
+                  nationalId || null,
+                  testName || null,
+                  uploadedFiles,
                   new Date().toISOString()
             ];
 
             const result = await client.query(query, values);
 
             res.json({ message: "success", data: result.rows[0] });
+
       } catch (error) {
             console.error("❌ Error in staffAddResult:", error);
             res.status(500).json({ message: "error", error: error.message });

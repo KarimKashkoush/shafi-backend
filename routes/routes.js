@@ -7,9 +7,13 @@ const { addReport } = require("../controllers/addReport");
 const { addResult } = require("../controllers/addResult");
 const { staffAddResult } = require("../controllers/stafResult");
 const { getFile } = require("../controllers/getFile");
+const { authenticateToken, requireRole, requireSelfOrRole } = require("../controllers/authenticateToken");
 
 const multer = require("multer");
 const { addAppointment, addResultToAppointment, getAppointmentsWithResults, deleteAppointment, updateNationalId } = require("../controllers/addAppointment");
+const { checkExistingResult } = require("../controllers/checkExistingResult");
+const { getAllResults } = require("../controllers/getResults");
+const { getResultsByNationalId } = require("../controllers/getResultsByNationalId");
 
 // Multer لتخزين الملفات في الذاكرة
 const storage = multer.memoryStorage();
@@ -27,31 +31,30 @@ const upload = multer({
 
 /* ====================== Routes ====================== */
 
-// Auth
+// ✅ Auth
 router.post("/register", registerUser);
 router.post("/login", login);
 
-// Users
-router.get("/user/:id", getUser);
-router.get("/allUsers", getAllUsers);
-router.put("/user/:id", updateUser);
+// ✅ Users
+router.get("/user/:id", authenticateToken, requireSelfOrRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), getUser);
+router.get("/allUsers", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), getAllUsers);
+router.put("/user/:id", authenticateToken, requireSelfOrRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), updateUser);
 
-// Reports
-router.post("/addReport", addReport);
+// ✅ Appointments
+router.post("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), addAppointment);
+router.get("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), getAppointmentsWithResults);
+router.put("/appointments/:id/nationalId", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), updateNationalId);
+router.delete("/appointments/:id", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), deleteAppointment);
+router.post("/appointments/:id/addResultAppointment", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), upload.array("files", 5), addResultToAppointment);
 
-// Results
-router.post("/reports/:reportId/addResult", upload.array("resultFiles", 5), addResult);
-router.post("/staffAddResult", upload.array("files", 5), staffAddResult);
-router.delete("/appointments/:id", deleteAppointment);
-router.put("/appointments/:id/nationalId", updateNationalId);
-
-
-// Files (عرض الملفات برابط مؤقت من S3)
-router.get("/files/:key", getFile);
-
-
-router.post("/appointments", addAppointment);
-router.post("/appointments/:id/addResultAppointment", upload.array("files", 5), addResultToAppointment);
-router.get("/appointments", getAppointmentsWithResults);
+// ✅ Reports & Results
+router.post("/addReport", authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology'), addReport);
+router.post("/reports/:reportId/addResult", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), upload.array("resultFiles", 5), addResult);
+router.post("/staffAddResult", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), upload.array("files", 5), staffAddResult);
+router.get("/results",authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), getAllResults);
+router.get("/results/nationalId/:nationalId",authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), getResultsByNationalId);
+// ✅ Files & Checks
+router.get("/files/:key", authenticateToken, getFile);
+router.get("/checkExistingResult", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), checkExistingResult);
 
 module.exports = router;
