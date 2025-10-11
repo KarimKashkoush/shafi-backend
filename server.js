@@ -25,12 +25,14 @@ const allowedOrigins = [
 
 app.use(cors({
       origin: function (origin, callback) {
-            // السماح بالطلبات من Postman أو السيرفر نفسه (بدون Origin)
             if (!origin) return callback(null, true);
 
-            if (!allowedOrigins.includes(origin)) {
-                  console.log("🚫 CORS Blocked Origin:", origin);
-                  return callback(new Error("Not allowed by CORS"), false);
+            // ✅ يقبل الدومينات اللي تبدأ بالكلمة دي
+            const isAllowed = allowedOrigins.some(o => origin.startsWith(o));
+
+            if (!isAllowed) {
+                  console.log("🚫 Forbidden Origin:", origin);
+                  return callback(null, false);
             }
 
             return callback(null, true);
@@ -38,6 +40,7 @@ app.use(cors({
       credentials: true,
       methods: ["GET", "POST", "PUT", "DELETE"]
 }));
+
 
 // ✅ تحديد عدد الطلبات (Rate Limiting)
 const limiter = rateLimit({
