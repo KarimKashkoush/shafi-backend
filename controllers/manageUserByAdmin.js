@@ -10,8 +10,8 @@ async function addUserByAdmin(req, res) {
 
             const result = await db.query(
                   `INSERT INTO users ("fullName", email, "phoneNumber", password, role, gender, status, "lastUpdated")
-       VALUES ($1, $2, $3, $4, $5, $6, TRUE, NOW())
-       RETURNING *`,
+             VALUES ($1, $2, $3, $4, $5, $6, TRUE, NOW())
+             RETURNING *`,
                   [fullName, email, phoneNumber, hashedPassword, userType, gender]
             );
 
@@ -28,9 +28,18 @@ async function addUserByAdmin(req, res) {
             res.status(201).json({ message: "تم إنشاء المستخدم بنجاح", user });
       } catch (err) {
             console.error(err);
+
+            // التعامل مع خطأ تكرار البريد أو الهاتف
+            if (err.code === "400") {
+                  if (err.constraint === "users_email_key") {
+                        return res.status(400).json({ message: "البريد الإلكتروني مستخدم بالفعل من قبل مستخدم آخر" });
+                  }
+            }
+
             res.status(500).json({ message: "حدث خطأ أثناء إنشاء المستخدم" });
       }
 }
+
 
 // ✅ جلب جميع المستخدمين
 async function getAllUsersByAdmin(req, res) {

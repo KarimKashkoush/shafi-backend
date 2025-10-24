@@ -4,7 +4,6 @@ const bcrypt = require('bcryptjs');
 // Register User
 async function registerUser(req, res) {
       const {
-            firstName,
             fullName,
             email,
             phoneNumber,
@@ -13,7 +12,7 @@ async function registerUser(req, res) {
             role,
             gender,
             nationalId,
-            specialty // 🩵 أضفنا ده
+            specialty 
       } = req.body;
 
       try {
@@ -29,10 +28,10 @@ async function registerUser(req, res) {
             const hashedPassword = await bcrypt.hash(password, 10);
 
             const newUser = await pool.query(
-                  `INSERT INTO users ("firstName", "fullName", email, "phoneNumber", password, pin, role, gender, "nationalId", specialty)
+                  `INSERT INTO users ( "fullName", email, "phoneNumber", password, pin, role, gender, "nationalId", specialty)
    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-   RETURNING id, "firstName", "fullName", email, "phoneNumber", "nationalId", role, gender, specialty`,
-                  [firstName, fullName, email, phoneNumber, hashedPassword, pin, role, gender, nationalId, specialty]
+   RETURNING id, "fullName", email, "phoneNumber", "nationalId", role, gender, specialty`,
+                  [fullName, email, phoneNumber, hashedPassword, pin, role, gender, nationalId, specialty]
             );
 
             res.status(201).json({ message: 'success', user: newUser.rows[0] });
@@ -41,8 +40,6 @@ async function registerUser(req, res) {
             res.status(500).json({ message: 'error', error: err.message });
       }
 }
-
-
 
 // Get All Users
 async function getAllUsers(req, res) {
@@ -86,7 +83,6 @@ async function updateUser(req, res) {
       const fields = req.body;
 
       const columnMap = {
-            firstname: "firstName",
             fullname: "fullName",
             phonenumber: "phoneNumber",
             email: "email",
@@ -102,14 +98,6 @@ async function updateUser(req, res) {
                   return res.status(400).json({ message: "مفيش بيانات لتحديثها" });
             }
 
-            // التحقق من الحقول الإلزامية
-            if (
-                  ("firstname" in fields && fields.firstname === "")
-            ) {
-                  return res
-                        .status(400)
-                        .json({ message: "الاسم ورقم الهاتف والايميل لازم يكونوا قيم مش فاضية" });
-            }
 
             const setClauses = [];
             const values = [];
@@ -141,7 +129,6 @@ async function updateUser(req, res) {
       WHERE id = $${index}
       RETURNING 
         id,
-        "firstName",
         "fullName",
         "phoneNumber",
         email,
