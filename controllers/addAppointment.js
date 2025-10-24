@@ -55,7 +55,7 @@ const addResultToAppointment = async (req, res) => {
       VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *`;
 
-            const values = [id, userId, caseName, phone, nationalId, testName, uploadedFiles];
+            const values = [id, userId, caseName, phone, nationalId, testName, JSON.stringify(uploadedFiles)];
             const resultInsert = await pool.query(query, values);
 
             res.json({ message: "success", data: resultInsert.rows[0] });
@@ -64,7 +64,6 @@ const addResultToAppointment = async (req, res) => {
             res.status(500).json({ message: "error", error: error.message });
       }
 };
-
 
 // ✅ 3. عرض كل الحجوزات مع النتائج
 const getAppointmentsWithResults = async (req, res) => {

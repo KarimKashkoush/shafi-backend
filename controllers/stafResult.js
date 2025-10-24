@@ -44,9 +44,10 @@ const staffAddResult = async (req, res) => {
                   phone || null,
                   nationalId || null,
                   testName || null,
-                  uploadedFiles,
+                  JSON.stringify(uploadedFiles),
                   new Date().toISOString()
             ];
+
 
             const result = await client.query(query, values);
 

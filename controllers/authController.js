@@ -3,42 +3,43 @@ const bcrypt = require('bcryptjs');
 
 // Register User
 async function registerUser(req, res) {
-  const {
-    firstName,
-    fullName,
-    email,
-    phoneNumber,
-    password,
-    pin,
-    role,
-    gender,
-    nationalId, // ✅ الرقم القومي الجديد
-  } = req.body;
+      const {
+            firstName,
+            fullName,
+            email,
+            phoneNumber,
+            password,
+            pin,
+            role,
+            gender,
+            nationalId,
+            specialty // 🩵 أضفنا ده
+      } = req.body;
 
-  try {
-    const existingUser = await pool.query(
-      'SELECT * FROM users WHERE email = $1 OR "phoneNumber" = $2 OR "nationalId" = $3',
-      [email || null, phoneNumber || null, nationalId || null]
-    );
+      try {
+            const existingUser = await pool.query(
+                  'SELECT * FROM users WHERE email = $1 OR "phoneNumber" = $2 OR "nationalId" = $3',
+                  [email || null, phoneNumber || null, nationalId || null]
+            );
 
-    if (existingUser.rows.length > 0) {
-      return res.status(400).json({ message: 'الحساب موجود بالفعل' });
-    }
+            if (existingUser.rows.length > 0) {
+                  return res.status(400).json({ message: 'الحساب موجود بالفعل' });
+            }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+            const hashedPassword = await bcrypt.hash(password, 10);
 
-    const newUser = await pool.query(
-      `INSERT INTO users ("firstName", "fullName", email, "phoneNumber", password, pin, role, gender, "nationalId")
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING id, "firstName", "fullName", email, "phoneNumber", "nationalId", role, gender`,
-      [firstName, fullName, email, phoneNumber, hashedPassword, pin, role, gender, nationalId]
-    );
+            const newUser = await pool.query(
+                  `INSERT INTO users ("firstName", "fullName", email, "phoneNumber", password, pin, role, gender, "nationalId", specialty)
+   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+   RETURNING id, "firstName", "fullName", email, "phoneNumber", "nationalId", role, gender, specialty`,
+                  [firstName, fullName, email, phoneNumber, hashedPassword, pin, role, gender, nationalId, specialty]
+            );
 
-    res.status(201).json({ message: 'success', user: newUser.rows[0] });
-  } catch (err) {
-    console.error("Database error:", err);
-    res.status(500).json({ message: 'error', error: err.message });
-  }
+            res.status(201).json({ message: 'success', user: newUser.rows[0] });
+      } catch (err) {
+            console.error("Database error:", err);
+            res.status(500).json({ message: 'error', error: err.message });
+      }
 }
 
 
