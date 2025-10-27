@@ -54,6 +54,7 @@ router.post("/reports/:reportId/addResult", authenticateToken, requireRole('pati
 router.post("/staffAddResult", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), upload.array("files", 5), staffAddResult);
 router.get("/results", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), getAllResults);
 router.get("/results/nationalId/:nationalId", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), getResultsByNationalId);
+
 // ✅ Files & Checks
 router.get("/files/:key", authenticateToken, getFile);
 router.get("/checkExistingResult", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), checkExistingResult);
@@ -71,5 +72,16 @@ router.post("/addUserByAdmin", authenticateToken, requireRole('admin'), addUserB
 router.get("/getUserByAdmin", authenticateToken, requireRole('admin'), getAllUsersByAdmin);
 router.patch("/addUserByAdmin/:id", authenticateToken, requireRole('admin'), toggleUserStatus);
 router.post("/getUserById", authenticateToken, requireRole('admin'), getUserById);
+
+
+
+
+const { getAllDoctors } = require("../controllers/getAllDoctors");
+
+
+
+// Doctors
+router.get("/doctors", authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology'), getAllDoctors);
+
 module.exports = router;
 

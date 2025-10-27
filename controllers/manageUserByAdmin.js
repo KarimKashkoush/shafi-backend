@@ -40,7 +40,6 @@ async function addUserByAdmin(req, res) {
       }
 }
 
-
 // ✅ جلب جميع المستخدمين
 async function getAllUsersByAdmin(req, res) {
       try {

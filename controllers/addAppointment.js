@@ -4,14 +4,15 @@ const { uploadFileToS3 } = require("../middleware/s3");
 // ✅ 1. إضافة حجز جديد (بدون نتيجة)
 const addAppointment = async (req, res) => {
       try {
-            const { caseName, phone, nationalId, testName, userId } = req.body;
+            const { caseName, phone, nationalId, testName, userId, doctorId } = req.body;
 
             const query = `
-            INSERT INTO appointments ("userId", "caseName", "phone", "nationalId", "testName")
-            VALUES ($1, $2, $3, $4, $5)
-            RETURNING *`;
+INSERT INTO appointments ("userId", "caseName", "phone", "nationalId", "testName", "doctorId")
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING *`;
 
-            const values = [userId, caseName, phone, nationalId || null, testName];
+            const values = [userId, caseName, phone, nationalId || null, testName, doctorId];
+
             const result = await pool.query(query, values);
 
             res.json({ message: "success", data: result.rows[0] });
@@ -67,22 +68,38 @@ const addResultToAppointment = async (req, res) => {
 
 // ✅ 3. عرض كل الحجوزات مع النتائج
 const getAppointmentsWithResults = async (req, res) => {
-      try {
-            const query = `
-    SELECT a.*, r.files AS "resultFiles", r."createdAt" AS "resultCreatedAt"
-    FROM appointments a
-    LEFT JOIN result r ON a.id = r."appointmentId"
-    ORDER BY a."createdAt" DESC
-`;
+  try {
+    const query = `
+      SELECT 
+        a.id,
+        a."userId",
+        a."caseName",
+        a."phone",
+        a."nationalId",
+        a."testName",
+        a."createdAt",
+        r.files AS "resultFiles",
+        r."createdAt" AS "resultCreatedAt",
+        d.id AS "doctorId",
+        u."fullName" AS "doctorName",
+        u."phoneNumber" AS "doctorPhone",
+        d.specialty AS "doctorSpecialty"
+      FROM appointments a
+      LEFT JOIN result r ON a.id = r."appointmentId"
+      LEFT JOIN doctors d ON a."doctorId" = d.id
+      LEFT JOIN users u ON d."userId" = u.id
+      ORDER BY a."createdAt" DESC
+    `;
 
-            const result = await pool.query(query);
-
-            res.json({ message: "success", data: result.rows });
-      } catch (error) {
-            console.error("❌ Error in getAppointmentsWithResults:", error);
-            res.status(500).json({ message: "error", error: error.message });
-      }
+    const result = await pool.query(query);
+    res.json({ message: "success", data: result.rows });
+  } catch (error) {
+    console.error("❌ Error in getAppointmentsWithResults:", error);
+    res.status(500).json({ message: "error", error: error.message });
+  }
 };
+
+
 
 // ✅ 4. حذف حجز بالـ id
 const deleteAppointment = async (req, res) => {
