@@ -11,7 +11,7 @@ const { authenticateToken, requireRole, requireSelfOrRole } = require("../contro
 const { addReceptionist, getReceptionists, updateReceptionistStatus, deleteReceptionist } = require('../controllers/receptionists');
 
 const multer = require("multer");
-const { addAppointment, addResultToAppointment, getAppointmentsWithResults, deleteAppointment, updateNationalId } = require("../controllers/addAppointment");
+const { addAppointment, addResultToAppointment, getAppointmentsWithResults, deleteAppointment, updateNationalId, getAppointmentById } = require("../controllers/addAppointment");
 const { checkExistingResult } = require("../controllers/checkExistingResult");
 const { getAllResults } = require("../controllers/getResults");
 const { getResultsByNationalId } = require("../controllers/getResultsByNationalId");
@@ -44,6 +44,7 @@ router.put("/user/:id", authenticateToken, requireSelfOrRole('patient', 'doctor'
 // ✅ Appointments
 router.post("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), addAppointment);
 router.get("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), getAppointmentsWithResults);
+router.get("/appointment/:id", getAppointmentById);
 router.put("/appointments/:id/nationalId", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), updateNationalId);
 router.delete("/appointments/:id", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), deleteAppointment);
 router.post("/appointments/:id/addResultAppointment", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), upload.array("files", 5), addResultToAppointment);

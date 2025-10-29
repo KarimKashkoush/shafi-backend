@@ -68,8 +68,8 @@ const addResultToAppointment = async (req, res) => {
 
 // ✅ 3. عرض كل الحجوزات مع النتائج
 const getAppointmentsWithResults = async (req, res) => {
-  try {
-    const query = `
+      try {
+            const query = `
       SELECT 
         a.id,
         a."userId",
@@ -91,12 +91,12 @@ const getAppointmentsWithResults = async (req, res) => {
       ORDER BY a."createdAt" DESC
     `;
 
-    const result = await pool.query(query);
-    res.json({ message: "success", data: result.rows });
-  } catch (error) {
-    console.error("❌ Error in getAppointmentsWithResults:", error);
-    res.status(500).json({ message: "error", error: error.message });
-  }
+            const result = await pool.query(query);
+            res.json({ message: "success", data: result.rows });
+      } catch (error) {
+            console.error("❌ Error in getAppointmentsWithResults:", error);
+            res.status(500).json({ message: "error", error: error.message });
+      }
 };
 
 
@@ -156,11 +156,50 @@ const updateNationalId = async (req, res) => {
 };
 
 
+const getAppointmentById = async (req, res) => {
+      try {
+            const { id } = req.params;
+
+            const query = `
+      SELECT 
+        a.id,
+        a."userId",
+        a."caseName",
+        a."phone",
+        a."nationalId",
+        a."testName",
+        a."createdAt",
+        r.files AS "resultFiles",
+        r."createdAt" AS "resultCreatedAt",
+        u."fullName" AS "doctorName",
+        u."phoneNumber" AS "doctorPhone",
+        d.specialty AS "doctorSpecialty"
+      FROM appointments a
+      LEFT JOIN result r ON a.id = r."appointmentId"
+      LEFT JOIN doctors d ON a."doctorId" = d.id
+      LEFT JOIN users u ON d."userId" = u.id
+      WHERE a.id = $1
+      LIMIT 1
+    `;
+
+            const result = await pool.query(query, [id]);
+
+            if (result.rowCount === 0) {
+                  return res.status(404).json({ message: "الحجز غير موجود" });
+            }
+
+            res.json({ message: "success", data: result.rows[0] });
+      } catch (error) {
+            console.error("❌ Error in getAppointmentById:", error);
+            res.status(500).json({ message: "error", error: error.message });
+      }
+};
 
 module.exports = {
       addAppointment,
       addResultToAppointment,
       getAppointmentsWithResults,
       deleteAppointment,
-      updateNationalId
+      updateNationalId,
+      getAppointmentById
 };
