@@ -7,6 +7,7 @@ const { addReport } = require("../controllers/addReport");
 const { addResult } = require("../controllers/addResult");
 const { staffAddResult } = require("../controllers/stafResult");
 const { getFile } = require("../controllers/getFile");
+const { getAllDoctors } = require("../controllers/getAllDoctors");
 const { authenticateToken, requireRole, requireSelfOrRole } = require("../controllers/authenticateToken");
 const { addReceptionist, getReceptionists, updateReceptionistStatus, deleteReceptionist } = require('../controllers/receptionists');
 
@@ -42,12 +43,12 @@ router.get("/allUsers", getAllUsers);
 router.put("/user/:id", authenticateToken, requireSelfOrRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), updateUser);
 
 // ✅ Appointments
-router.post("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), addAppointment);
-router.get("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), getAppointmentsWithResults);
+router.post("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception'), addAppointment);
+router.get("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception'), getAppointmentsWithResults);
 router.get("/appointment/:id", getAppointmentById);
-router.put("/appointments/:id/nationalId", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), updateNationalId);
-router.delete("/appointments/:id", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), deleteAppointment);
-router.post("/appointments/:id/addResultAppointment", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), upload.array("files", 5), addResultToAppointment);
+router.put("/appointments/:id/nationalId", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception'), updateNationalId);
+router.delete("/appointments/:id", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception'), deleteAppointment);
+router.post("/appointments/:id/addResultAppointment", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception'), upload.array("files", 5), addResultToAppointment);
 
 // ✅ Reports & Results
 router.post("/addReport", authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology'), addReport);
@@ -60,13 +61,11 @@ router.get("/results/nationalId/:nationalId", authenticateToken, requireRole('pa
 router.get("/files/:key", authenticateToken, getFile);
 router.get("/checkExistingResult", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), checkExistingResult);
 
-
 // receptionists
 router.post('/addReceptionists', authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology'), addReceptionist);
 router.get('/getReceptionists', authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology'), getReceptionists);
 router.patch('/updateReceptionistStatus/:id', authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology'), updateReceptionistStatus);
 router.delete('/deleteReceptionist/:id', authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology'), deleteReceptionist);
-
 
 // Admin - Add User
 router.post("/addUserByAdmin", authenticateToken, requireRole('admin'), addUserByAdmin);
@@ -77,12 +76,11 @@ router.post("/getUserById", authenticateToken, requireRole('admin'), getUserById
 
 
 
-const { getAllDoctors } = require("../controllers/getAllDoctors");
 
 
 
 // Doctors
-router.get("/doctors", authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology'), getAllDoctors);
+router.get("/doctors", authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception'), getAllDoctors);
 
 module.exports = router;
 

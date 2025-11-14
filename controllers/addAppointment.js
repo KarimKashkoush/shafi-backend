@@ -6,12 +6,25 @@ const addAppointment = async (req, res) => {
       try {
             const { caseName, phone, nationalId, testName, userId, doctorId } = req.body;
 
-            const query = `
-INSERT INTO appointments ("userId", "caseName", "phone", "nationalId", "testName", "doctorId")
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING *`;
+            // ✅ جلب الـ centerId تلقائي من جدول receptionists
+            let centerId = null;
+            const receptionistQuery = await pool.query(
+                  'SELECT "creatorId" FROM receptionists WHERE "receptionistId" = $1',
+                  [userId]
+            );
 
-            const values = [userId, caseName, phone, nationalId || null, testName, doctorId];
+            if (receptionistQuery.rows.length > 0) {
+                  centerId = receptionistQuery.rows[0].creatorId;
+            }
+
+            // ✅ إضافة الحجز في جدول appointments
+            const query = `
+      INSERT INTO appointments ("userId", "caseName", "phone", "nationalId", "testName", "doctorId", "centerId")
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING *;
+    `;
+
+            const values = [userId, caseName, phone, nationalId || null, testName, doctorId, centerId];
 
             const result = await pool.query(query, values);
 
@@ -21,6 +34,7 @@ RETURNING *`;
             res.status(500).json({ message: "error", error: error.message });
       }
 };
+
 
 // ✅ 2. إضافة نتيجة لحجز موجود (upload files → S3 → save in result)
 const addResultToAppointment = async (req, res) => {
@@ -71,24 +85,30 @@ const getAppointmentsWithResults = async (req, res) => {
       try {
             const query = `
       SELECT 
-        a.id,
-        a."userId",
-        a."caseName",
-        a."phone",
-        a."nationalId",
-        a."testName",
-        a."createdAt",
-        r.files AS "resultFiles",
-        r."createdAt" AS "resultCreatedAt",
-        d.id AS "doctorId",
-        u."fullName" AS "doctorName",
-        u."phoneNumber" AS "doctorPhone",
-        d.specialty AS "doctorSpecialty"
-      FROM appointments a
-      LEFT JOIN result r ON a.id = r."appointmentId"
-      LEFT JOIN doctors d ON a."doctorId" = d.id
-      LEFT JOIN users u ON d."userId" = u.id
-      ORDER BY a."createdAt" DESC
+  a.id,
+  a."userId",
+  a."caseName",
+  a."phone",
+  a."nationalId",
+  a."testName",
+  a."createdAt",
+
+  r.files AS "resultFiles",
+  r."createdAt" AS "resultCreatedAt",
+
+  d.id AS "doctorId",
+  u."fullName" AS "doctorName",
+  u."phoneNumber" AS "doctorPhone",
+  d.specialty AS "doctorSpecialty",
+
+  a."centerId"  -- ✅ هنا جلبنا centerId مباشرة من appointments
+
+FROM appointments a
+LEFT JOIN result r ON a.id = r."appointmentId"
+LEFT JOIN doctors d ON a."doctorId" = d.id
+LEFT JOIN users u ON d."userId" = u.id
+
+ORDER BY a."createdAt" DESC;
     `;
 
             const result = await pool.query(query);
@@ -98,8 +118,6 @@ const getAppointmentsWithResults = async (req, res) => {
             res.status(500).json({ message: "error", error: error.message });
       }
 };
-
-
 
 // ✅ 4. حذف حجز بالـ id
 const deleteAppointment = async (req, res) => {

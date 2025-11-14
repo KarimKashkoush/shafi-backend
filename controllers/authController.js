@@ -12,7 +12,6 @@ async function registerUser(req, res) {
             role,
             gender,
             nationalId,
-            specialty 
       } = req.body;
 
       try {
@@ -28,11 +27,12 @@ async function registerUser(req, res) {
             const hashedPassword = await bcrypt.hash(password, 10);
 
             const newUser = await pool.query(
-                  `INSERT INTO users ( "fullName", email, "phoneNumber", password, pin, role, gender, "nationalId", specialty)
-   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-   RETURNING id, "fullName", email, "phoneNumber", "nationalId", role, gender, specialty`,
-                  [fullName, email, phoneNumber, hashedPassword, pin, role, gender, nationalId, specialty]
+                  `INSERT INTO users ("fullName", email, "phoneNumber", password, pin, role, gender, "nationalId")
+   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+   RETURNING id, "fullName", email, "phoneNumber", "nationalId", role, gender`,
+                  [fullName, email, phoneNumber, hashedPassword, pin, role, gender, nationalId]
             );
+
 
             res.status(201).json({ message: 'success', user: newUser.rows[0] });
       } catch (err) {
