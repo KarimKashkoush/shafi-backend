@@ -3,36 +3,53 @@ const { uploadFileToS3 } = require("../middleware/s3");
 
 // ✅ 1. إضافة حجز جديد (بدون نتيجة)
 const addAppointment = async (req, res) => {
-      try {
-            const { caseName, phone, nationalId, testName, userId, doctorId } = req.body;
+    try {
+        // كل القيم من body، مع fallback لـ null
+        const userId = req.body.userId || null;
+        const caseName = req.body.caseName || null;
+        const phone = req.body.phone || null;
+        const nationalId = req.body.nationalId || null;
+        const testName = req.body.testName || null;
+        const doctorId = req.body.doctorId || null;
+        const dateTime = req.body.dateTime || null;
 
-            // ✅ جلب الـ centerId تلقائي من جدول receptionists
-            let centerId = null;
+        // جلب centerId لو userId موجود
+        let centerId = null;
+        if (userId) {
             const receptionistQuery = await pool.query(
-                  'SELECT "creatorId" FROM receptionists WHERE "receptionistId" = $1',
-                  [userId]
+                'SELECT "creatorId" FROM receptionists WHERE "receptionistId" = $1',
+                [userId]
             );
-
             if (receptionistQuery.rows.length > 0) {
-                  centerId = receptionistQuery.rows[0].creatorId;
+                centerId = receptionistQuery.rows[0].creatorId;
             }
+        }
 
-            // ✅ إضافة الحجز في جدول appointments
-            const query = `
-      INSERT INTO appointments ("userId", "caseName", "phone", "nationalId", "testName", "doctorId", "centerId")
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING *;
-    `;
+        const query = `
+            INSERT INTO appointments 
+            ("userId", "caseName", "phone", "nationalId", "testName", "doctorId", "centerId", "dateTime")
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING *;
+        `;
 
-            const values = [userId, caseName, phone, nationalId || null, testName, doctorId, centerId];
+        const values = [
+            userId,
+            caseName,
+            phone,
+            nationalId,
+            testName,
+            doctorId,
+            centerId,
+            dateTime
+        ];
 
-            const result = await pool.query(query, values);
+        const result = await pool.query(query, values);
 
-            res.json({ message: "success", data: result.rows[0] });
-      } catch (error) {
-            console.error("❌ Error in addAppointment:", error);
-            res.status(500).json({ message: "error", error: error.message });
-      }
+        res.json({ message: "success", data: result.rows[0] });
+    } catch (error) {
+        console.error("❌ Error in addAppointment:", error);
+        res.status(500).json({ message: "error", error: error.message });
+    }
 };
 
 
