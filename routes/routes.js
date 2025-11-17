@@ -17,6 +17,7 @@ const { checkExistingResult } = require("../controllers/checkExistingResult");
 const { getAllResults } = require("../controllers/getResults");
 const { getResultsByNationalId } = require("../controllers/getResultsByNationalId");
 const { addUserByAdmin, getAllUsersByAdmin, getUserById, toggleUserStatus } = require("../controllers/manageUserByAdmin");
+const { getPatientReports } = require("../controllers/doctorPatientReports");
 
 // Multer لتخزين الملفات في الذاكرة
 const storage = multer.memoryStorage();
@@ -75,7 +76,7 @@ router.post("/getUserById", authenticateToken, requireRole('admin'), getUserById
 
 
 
-
+router.get("/doctor/patientFiles/:nationalId", authenticateToken, requireRole("doctor"), getPatientReports);
 
 
 
