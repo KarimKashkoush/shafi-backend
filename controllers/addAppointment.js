@@ -1,55 +1,54 @@
 const pool = require('../db');
 const { uploadFileToS3 } = require("../middleware/s3");
 
-// ✅ 1. إضافة حجز جديد (بدون نتيجة)
 const addAppointment = async (req, res) => {
-    try {
-        // كل القيم من body، مع fallback لـ null
-        const userId = req.body.userId || null;
-        const caseName = req.body.caseName || null;
-        const phone = req.body.phone || null;
-        const nationalId = req.body.nationalId || null;
-        const testName = req.body.testName || null;
-        const doctorId = req.body.doctorId || null;
-        const dateTime = req.body.dateTime || null;
+      try {
+            // كل القيم من body، مع fallback لـ null
+            const userId = req.body.userId || null;
+            const caseName = req.body.caseName || null;
+            const phone = req.body.phone || null;
+            const nationalId = req.body.nationalId || null;
+            const testName = req.body.testName || null;
+            const doctorId = req.body.doctorId || null;
+            const dateTime = req.body.dateTime || null;
 
-        // جلب centerId لو userId موجود
-        let centerId = null;
-        if (userId) {
-            const receptionistQuery = await pool.query(
-                'SELECT "creatorId" FROM receptionists WHERE "receptionistId" = $1',
-                [userId]
-            );
-            if (receptionistQuery.rows.length > 0) {
-                centerId = receptionistQuery.rows[0].creatorId;
+            // جلب centerId لو userId موجود
+            let centerId = null;
+            if (userId) {
+                  const receptionistQuery = await pool.query(
+                        'SELECT "creatorId" FROM receptionists WHERE "receptionistId" = $1',
+                        [userId]
+                  );
+                  if (receptionistQuery.rows.length > 0) {
+                        centerId = receptionistQuery.rows[0].creatorId;
+                  }
             }
-        }
 
-        const query = `
+            const query = `
             INSERT INTO appointments 
             ("userId", "caseName", "phone", "nationalId", "testName", "doctorId", "centerId", "dateTime")
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *;
         `;
 
-        const values = [
-            userId,
-            caseName,
-            phone,
-            nationalId,
-            testName,
-            doctorId,
-            centerId,
-            dateTime
-        ];
+            const values = [
+                  userId,
+                  caseName,
+                  phone,
+                  nationalId,
+                  testName,
+                  doctorId,
+                  centerId,
+                  dateTime
+            ];
 
-        const result = await pool.query(query, values);
+            const result = await pool.query(query, values);
 
-        res.json({ message: "success", data: result.rows[0] });
-    } catch (error) {
-        console.error("❌ Error in addAppointment:", error);
-        res.status(500).json({ message: "error", error: error.message });
-    }
+            res.json({ message: "success", data: result.rows[0] });
+      } catch (error) {
+            console.error("❌ Error in addAppointment:", error);
+            res.status(500).json({ message: "error", error: error.message });
+      }
 };
 
 
@@ -57,7 +56,7 @@ const addAppointment = async (req, res) => {
 const addResultToAppointment = async (req, res) => {
       try {
             const { id } = req.params; // appointmentId
-            const { userId } = req.body;
+            const { userId, report, nextAction } = req.body;
 
             // هات بيانات الحجز الأول
             const apptRes = await pool.query(
@@ -83,12 +82,21 @@ const addResultToAppointment = async (req, res) => {
 
             // إدخال النتيجة مرتبطة بالحجز
             const query = `
-      INSERT INTO result ("appointmentId", "userId", "caseName", "phone", "nationalId", "testName", "files")
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING *`;
+            INSERT INTO result ("appointmentId", "userId", "caseName", "phone", "nationalId", "testName", "files", "report", "nextAction")
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING *`;
 
-            const values = [id, userId, caseName, phone, nationalId, testName, JSON.stringify(uploadedFiles)];
-            const resultInsert = await pool.query(query, values);
+            const values = [
+                  id,
+                  userId,
+                  caseName,
+                  phone,
+                  nationalId,
+                  testName,
+                  JSON.stringify(uploadedFiles),
+                  report || null,
+                  nextAction || null
+            ]; const resultInsert = await pool.query(query, values);
 
             res.json({ message: "success", data: resultInsert.rows[0] });
       } catch (error) {
@@ -189,7 +197,6 @@ const updateNationalId = async (req, res) => {
             res.status(500).json({ message: "error", error: error.message });
       }
 };
-
 
 const getAppointmentById = async (req, res) => {
       try {
