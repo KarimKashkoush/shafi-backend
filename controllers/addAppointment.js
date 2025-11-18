@@ -3,7 +3,6 @@ const { uploadFileToS3 } = require("../middleware/s3");
 
 const addAppointment = async (req, res) => {
       try {
-            // كل القيم من body، مع fallback لـ null
             const userId = req.body.userId || null;
             const caseName = req.body.caseName || null;
             const phone = req.body.phone || null;
@@ -11,6 +10,11 @@ const addAppointment = async (req, res) => {
             const testName = req.body.testName || null;
             const doctorId = req.body.doctorId || null;
             const dateTime = req.body.dateTime || null;
+            
+            // الحقول الجديدة
+            const birthDate = req.body.birthDate || null;
+            const hasChronicDisease = req.body.hasChronicDisease || false;
+            const chronicDiseaseDetails = req.body.chronicDiseaseDetails || null;
 
             // جلب centerId لو userId موجود
             let centerId = null;
@@ -26,8 +30,9 @@ const addAppointment = async (req, res) => {
 
             const query = `
             INSERT INTO appointments 
-            ("userId", "caseName", "phone", "nationalId", "testName", "doctorId", "centerId", "dateTime")
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            ("userId", "caseName", "phone", "nationalId", "testName", "doctorId", "centerId", "dateTime",
+             "birthDate", "hasChronicDisease", "chronicDiseaseDetails")
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING *;
         `;
 
@@ -39,7 +44,10 @@ const addAppointment = async (req, res) => {
                   testName,
                   doctorId,
                   centerId,
-                  dateTime
+                  dateTime,
+                  birthDate,
+                  hasChronicDisease,
+                  chronicDiseaseDetails
             ];
 
             const result = await pool.query(query, values);
@@ -50,6 +58,7 @@ const addAppointment = async (req, res) => {
             res.status(500).json({ message: "error", error: error.message });
       }
 };
+
 
 
 // ✅ 2. إضافة نتيجة لحجز موجود (upload files → S3 → save in result)
@@ -117,6 +126,10 @@ const getAppointmentsWithResults = async (req, res) => {
   a."nationalId",
   a."testName",
   a."createdAt",
+  a."dateTime",
+  a."birthDate",
+  a."hasChronicDisease",
+  a."chronicDiseaseDetails",
 
   r.files AS "resultFiles",
   r."createdAt" AS "resultCreatedAt",
