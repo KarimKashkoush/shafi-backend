@@ -1,5 +1,6 @@
 const pool = require('../db');
 const bcrypt = require('bcryptjs');
+const { toUtcIso } = require('../utils/datetime');
 
 // Register User
 async function registerUser(req, res) {
@@ -107,7 +108,14 @@ async function updateUser(req, res) {
                   const column = columnMap[key.toLowerCase()];
                   if (column) {
                         // لو القيمة فاضية نخليها NULL
-                        const safeValue = value === "" ? null : value;
+                        let safeValue = value === "" ? null : value;
+                        if (column === "birthDate" && safeValue) {
+                              const normalizedBirthDate = toUtcIso(safeValue, { dateOnly: true });
+                              if (!normalizedBirthDate) {
+                                    return res.status(400).json({ message: "تاريخ ميلاد غير صالح" });
+                              }
+                              safeValue = normalizedBirthDate;
+                        }
 
                         setClauses.push(`"${column}" = $${index}`);
                         values.push(safeValue);

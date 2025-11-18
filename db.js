@@ -8,9 +8,15 @@ const pool = new Pool({
       port: process.env.DB_PORT,
 
       ssl: {
-            require: true,              
-            rejectUnauthorized: false, 
+            require: true,
+            rejectUnauthorized: false,
       },
+});
+
+pool.on('connect', (client) => {
+      client.query(`SET TIME ZONE 'UTC';`).catch((error) => {
+            console.error('Failed to enforce UTC timezone', error);
+      });
 });
 
 module.exports = pool;

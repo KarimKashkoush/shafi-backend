@@ -1,4 +1,5 @@
 const pool = require("../db");
+const { toUtcIso } = require("../utils/datetime");
 
 async function addReport(req, res) {
   const {
@@ -25,6 +26,16 @@ async function addReport(req, res) {
       result: null
     }));
 
+    const normalizedMedications = Array.isArray(medications)
+      ? medications.map((item) => ({
+        ...item,
+        startDate: item?.startDate ? toUtcIso(item.startDate, { dateOnly: true }) : null,
+        endDate: item?.endDate ? toUtcIso(item.endDate, { dateOnly: true }) : null,
+      }))
+      : null;
+
+    const normalizedCreatedAt = toUtcIso(createdAt) || new Date().toISOString();
+
     const query = `
   INSERT INTO reports
   ("userId", "reportText", "chronicDisease", "chronicDiseaseName", "medications", "radiology", "labTests", "createdAt")
@@ -38,10 +49,10 @@ async function addReport(req, res) {
       reportText || null,
       chronicDisease || null,
       chronicDiseaseName || null,
-      medications ? JSON.stringify(medications) : null,
+      normalizedMedications ? JSON.stringify(normalizedMedications) : null,
       radiology ? JSON.stringify(radiologyWithResult) : null,
       labTests ? JSON.stringify(labTestsWithResult) : null,
-      createdAt || new Date().toISOString()
+      normalizedCreatedAt
     ];
 
     const result = await pool.query(query, values);

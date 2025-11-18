@@ -1,5 +1,6 @@
 const pool = require('../db');
 const { uploadFileToS3 } = require("../middleware/s3");
+const { toUtcIso } = require("../utils/datetime");
 
 const addAppointment = async (req, res) => {
       try {
@@ -15,6 +16,17 @@ const addAppointment = async (req, res) => {
             const birthDate = req.body.birthDate || null;
             const hasChronicDisease = req.body.hasChronicDisease || false;
             const chronicDiseaseDetails = req.body.chronicDiseaseDetails || null;
+
+            const normalizedDateTime = dateTime ? toUtcIso(dateTime) : null;
+            const normalizedBirthDate = birthDate ? toUtcIso(birthDate, { dateOnly: true }) : null;
+
+            if (dateTime && !normalizedDateTime) {
+                  return res.status(400).json({ message: "تاريخ / وقت الحجز غير صالح" });
+            }
+
+            if (birthDate && !normalizedBirthDate) {
+                  return res.status(400).json({ message: "تاريخ الميلاد غير صالح" });
+            }
 
             // جلب centerId لو userId موجود
             let centerId = null;
@@ -44,8 +56,8 @@ const addAppointment = async (req, res) => {
                   testName,
                   doctorId,
                   centerId,
-                  dateTime,
-                  birthDate,
+                  normalizedDateTime,
+                  normalizedBirthDate,
                   hasChronicDisease,
                   chronicDiseaseDetails
             ];
