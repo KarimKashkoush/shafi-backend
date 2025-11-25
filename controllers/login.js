@@ -14,8 +14,12 @@ async function login(req, res) {
       }
 
       try {
+            // جلب بيانات المستخدم + creatorId لو موجود في receptionists
             const userQuery = await pool.query(
-                  'SELECT * FROM "users" WHERE email = $1 OR "phoneNumber" = $1',
+                  `SELECT u.*, r."creatorId"
+             FROM "users" u
+             LEFT JOIN "receptionists" r ON u.id = r."receptionistId"
+             WHERE u.email = $1 OR u."phoneNumber" = $1`,
                   [loginValue]
             );
 
@@ -44,11 +48,13 @@ async function login(req, res) {
                         firstName: user.firstName,
                         fullName: user.fullName,
                         email: user.email,
-                        phoneNumber: user.phoneNumber, 
+                        phoneNumber: user.phoneNumber,
                         role: user.role,
-                        gender: user.gender
+                        gender: user.gender,
+                        creatorId: user.creatorId || null
                   }
             });
+
       } catch (err) {
             console.error("Database error:", err);
             res.status(500).json({ message: 'error', error: err.message });

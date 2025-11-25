@@ -44,12 +44,12 @@ router.get("/allUsers", getAllUsers);
 router.put("/user/:id", authenticateToken, requireSelfOrRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), updateUser);
 
 // ✅ Appointments
-router.post("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception'), addAppointment);
-router.get("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception'), getAppointmentsWithResults);
+router.post("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception', 'clinic_reception'), addAppointment);
+router.get("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception', 'clinic_reception'), getAppointmentsWithResults);
 router.get("/appointment/:id", getAppointmentById);
-router.put("/appointments/:id/nationalId", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception'), updateNationalId);
-router.delete("/appointments/:id", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception'), deleteAppointment);
-router.post("/appointments/:id/addResultAppointment", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception'), upload.array("files", 5), addResultToAppointment);
+router.put("/appointments/:id/nationalId", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception', 'clinic_reception'), updateNationalId);
+router.delete("/appointments/:id", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception', 'clinic_reception'), deleteAppointment);
+router.post("/appointments/:id/addResultAppointment", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception', 'clinic_reception'), upload.array("files", 5), addResultToAppointment);
 
 // ✅ Reports & Results
 router.post("/addReport", authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology'), addReport);
@@ -76,7 +76,7 @@ router.post("/getUserById", authenticateToken, requireRole('admin'), getUserById
 
 
 
-router.get("/doctor/patientFiles/:nationalId", authenticateToken, requireRole("doctor"), getPatientReports);
+router.get("/doctor/patientFiles/:nationalId", authenticateToken, requireRole("doctor",  'clinic_reception'), getPatientReports);
 
 
 
