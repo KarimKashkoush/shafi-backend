@@ -76,7 +76,7 @@ router.post("/getUserById", authenticateToken, requireRole('admin'), getUserById
 
 
 
-router.get("/doctor/patientFiles/:nationalId", authenticateToken, requireRole("doctor",  'clinic_reception'), getPatientReports);
+router.get("/doctor/patientFiles/:nationalId", getPatientReports);
 
 
 
