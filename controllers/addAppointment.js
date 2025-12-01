@@ -11,11 +11,14 @@ const addAppointment = async (req, res) => {
             const testName = req.body.testName || null;
             const doctorId = req.body.doctorId || null;
             const dateTime = req.body.dateTime || null;
-            
+
             // الحقول الجديدة
             const birthDate = req.body.birthDate || null;
             const hasChronicDisease = req.body.hasChronicDisease || false;
             const chronicDiseaseDetails = req.body.chronicDiseaseDetails || null;
+
+            // 👈 الحقل الجديد (اختياري)
+            const price = req.body.price || null;
 
             const normalizedDateTime = dateTime ? toUtcIso(dateTime) : null;
             const normalizedBirthDate = birthDate ? toUtcIso(birthDate, { dateOnly: true }) : null;
@@ -43,10 +46,10 @@ const addAppointment = async (req, res) => {
             const query = `
             INSERT INTO appointments 
             ("userId", "caseName", "phone", "nationalId", "testName", "doctorId", "centerId", "dateTime",
-             "birthDate", "hasChronicDisease", "chronicDiseaseDetails")
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            "birthDate", "hasChronicDisease", "chronicDiseaseDetails", "price")
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             RETURNING *;
-        `;
+      `;
 
             const values = [
                   userId,
@@ -59,7 +62,8 @@ const addAppointment = async (req, res) => {
                   normalizedDateTime,
                   normalizedBirthDate,
                   hasChronicDisease,
-                  chronicDiseaseDetails
+                  chronicDiseaseDetails,
+                  price
             ];
 
             const result = await pool.query(query, values);
@@ -72,17 +76,16 @@ const addAppointment = async (req, res) => {
 };
 
 
-
 // ✅ 2. إضافة نتيجة لحجز موجود (upload files → S3 → save in result)
 const addResultToAppointment = async (req, res) => {
       try {
             const { id } = req.params; // appointmentId
-            const { userId, report, nextAction } = req.body;
+            const { userId, report, nextAction, sessionCost } = req.body;
 
             // هات بيانات الحجز الأول
             const apptRes = await pool.query(
                   `SELECT "caseName", "phone", "nationalId", "testName"
-       FROM appointments WHERE id = $1`,
+                  FROM appointments WHERE id = $1`,
                   [id]
             );
 
@@ -103,9 +106,10 @@ const addResultToAppointment = async (req, res) => {
 
             // إدخال النتيجة مرتبطة بالحجز
             const query = `
-            INSERT INTO result ("appointmentId", "userId", "caseName", "phone", "nationalId", "testName", "files", "report", "nextAction")
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            RETURNING *`;
+            INSERT INTO result ("appointmentId", "userId", "caseName", "phone", "nationalId", "testName", "files", "report", "nextAction", "sessionCost")
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING *
+            `;
 
             const values = [
                   id,
@@ -116,8 +120,11 @@ const addResultToAppointment = async (req, res) => {
                   testName,
                   JSON.stringify(uploadedFiles),
                   report || null,
-                  nextAction || null
-            ]; const resultInsert = await pool.query(query, values);
+                  nextAction || null,
+                  sessionCost || null
+            ];
+
+            const resultInsert = await pool.query(query, values);
 
             res.json({ message: "success", data: resultInsert.rows[0] });
       } catch (error) {
@@ -125,6 +132,7 @@ const addResultToAppointment = async (req, res) => {
             res.status(500).json({ message: "error", error: error.message });
       }
 };
+
 
 // ✅ 3. عرض كل الحجوزات مع النتائج
 const getAppointmentsWithResults = async (req, res) => {
@@ -145,6 +153,8 @@ const getAppointmentsWithResults = async (req, res) => {
 
   r.files AS "resultFiles",
   r."createdAt" AS "resultCreatedAt",
+  r."sessionCost" AS "sessionCost",
+
 
   d.id AS "doctorId",
   u."fullName" AS "doctorName",
