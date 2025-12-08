@@ -17,7 +17,7 @@ const addAppointment = async (req, res) => {
             const hasChronicDisease = req.body.hasChronicDisease || false;
             const chronicDiseaseDetails = req.body.chronicDiseaseDetails || null;
 
-            // 👈 الحقل الجديد (اختياري)
+            // الحقل الجديد (اختياري)
             const price = req.body.price || null;
 
             const normalizedDateTime = dateTime ? toUtcIso(dateTime) : null;
@@ -31,15 +31,31 @@ const addAppointment = async (req, res) => {
                   return res.status(400).json({ message: "تاريخ الميلاد غير صالح" });
             }
 
-            // جلب centerId لو userId موجود
+            // تحديد centerId بحيث يظهر الحجز للجميع
             let centerId = null;
-            if (userId) {
+
+            // نجيب centerId من الدكتور لو موجود
+            if (doctorId) {
+                  const doctorQuery = await pool.query(
+                        'SELECT "centerId" FROM doctors WHERE "doctorId" = $1',
+                        [doctorId]
+                  );
+                  if (doctorQuery.rows.length > 0) {
+                        centerId = doctorQuery.rows[0].centerId;
+                  }
+            }
+
+            // لو ما حصلش centerId من الدكتور، نجيبها من الـ receptionist لو في userId
+            if (!centerId && userId) {
                   const receptionistQuery = await pool.query(
                         'SELECT "creatorId" FROM receptionists WHERE "receptionistId" = $1',
                         [userId]
                   );
                   if (receptionistQuery.rows.length > 0) {
                         centerId = receptionistQuery.rows[0].creatorId;
+                  } else if (req.user?.role === 'doctor' && Number(userId) === req.user?.userId) {
+                        // لو الدكتور نفسه ضاف الحالة وما فيش receptionist
+                        centerId = userId;
                   }
             }
 
@@ -75,17 +91,18 @@ const addAppointment = async (req, res) => {
       }
 };
 
-
 // ✅ 2. إضافة نتيجة لحجز موجود (upload files → S3 → save in result)
 const addResultToAppointment = async (req, res) => {
       try {
             const { id } = req.params; // appointmentId
             const { userId, report, nextAction, sessionCost } = req.body;
 
-            // هات بيانات الحجز الأول
+            if (!userId) return res.status(400).json({ message: "userId (الدكتور) مطلوب" });
+
+            // هات بيانات الحجز
             const apptRes = await pool.query(
                   `SELECT "caseName", "phone", "nationalId", "testName"
-                  FROM appointments WHERE id = $1`,
+             FROM appointments WHERE id = $1`,
                   [id]
             );
 
@@ -106,17 +123,17 @@ const addResultToAppointment = async (req, res) => {
 
             // إدخال النتيجة مرتبطة بالحجز
             const query = `
-            INSERT INTO result ("appointmentId", "userId", "caseName", "phone", "nationalId", "testName", "files", "report", "nextAction", "sessionCost")
+            INSERT INTO result ("appointmentId", "doctorId", "caseName", "phone", "nationalId", "testName", "files", "report", "nextAction", "sessionCost")
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
             RETURNING *
-            `;
+        `;
 
             const values = [
                   id,
-                  userId,
+                  userId,           // الدكتور
                   caseName,
                   phone,
-                  nationalId,
+                  nationalId,       // المريض عن طريق الرقم القومي
                   testName,
                   JSON.stringify(uploadedFiles),
                   report || null,
@@ -125,58 +142,61 @@ const addResultToAppointment = async (req, res) => {
             ];
 
             const resultInsert = await pool.query(query, values);
+            const newResult = resultInsert.rows[0];
 
-            res.json({ message: "success", data: resultInsert.rows[0] });
+            // إضافة سجل في جدول payments مرتبط بالدكتور والمريض (nationalId)
+            if (sessionCost && sessionCost > 0) {
+                  await pool.query(
+                        `INSERT INTO payments ("doctorId", "patientNationalId", "sessionId", "amount", "paymentMethod")
+                 VALUES ($1, $2, $3, $4, $5)`,
+                        [userId, nationalId, newResult.id, 0, null] // المبلغ يبدأ 0
+                  );
+            }
+
+            res.status(201).json({ message: "success", data: newResult });
+
       } catch (error) {
             console.error("❌ Error in addResultToAppointment:", error);
             res.status(500).json({ message: "error", error: error.message });
       }
 };
 
-
 // ✅ 3. عرض كل الحجوزات مع النتائج
 const getAppointmentsWithResults = async (req, res) => {
-      try {
-            const query = `
-      SELECT 
-  a.id,
-  a."userId",
-  a."caseName",
-  a."phone",
-  a."nationalId",
-  a."testName",
-  a."createdAt",
-  a."dateTime",
-  a."birthDate",
-  a."hasChronicDisease",
-  a."chronicDiseaseDetails",
+    try {
+        const query = `
+        SELECT 
+            a.id,
+            a."userId",
+            a."caseName",
+            a."phone",
+            a."nationalId",
+            a."testName",
+            a."createdAt",
+            a."dateTime",
+            a."birthDate",
+            a."hasChronicDisease",
+            a."chronicDiseaseDetails",
 
-  r.files AS "resultFiles",
-  r."createdAt" AS "resultCreatedAt",
-  r."sessionCost" AS "sessionCost",
+            r.files AS "resultFiles",
+            r."createdAt" AS "resultCreatedAt",
+            r."sessionCost" AS "sessionCost",
 
+            d.id AS "doctorId",
+            u.id AS "doctorUserId"
+        FROM appointments a
+        LEFT JOIN result r ON a.id = r."appointmentId"
+        LEFT JOIN doctors d ON a."doctorId" = d.id
+        LEFT JOIN users u ON d."userId" = u.id
+        ORDER BY a."createdAt" DESC;
+        `;
 
-  d.id AS "doctorId",
-  u."fullName" AS "doctorName",
-  u."phoneNumber" AS "doctorPhone",
-  d.specialty AS "doctorSpecialty",
-
-  a."centerId"  -- ✅ هنا جلبنا centerId مباشرة من appointments
-
-FROM appointments a
-LEFT JOIN result r ON a.id = r."appointmentId"
-LEFT JOIN doctors d ON a."doctorId" = d.id
-LEFT JOIN users u ON d."userId" = u.id
-
-ORDER BY a."createdAt" DESC;
-    `;
-
-            const result = await pool.query(query);
-            res.json({ message: "success", data: result.rows });
-      } catch (error) {
-            console.error("❌ Error in getAppointmentsWithResults:", error);
-            res.status(500).json({ message: "error", error: error.message });
-      }
+        const result = await pool.query(query);
+        res.json({ message: "success", data: result.rows });
+    } catch (error) {
+        console.error("❌ Error in getAppointmentsWithResults:", error);
+        res.status(500).json({ message: "error", error: error.message });
+    }
 };
 
 // ✅ 4. حذف حجز بالـ id

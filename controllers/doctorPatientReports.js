@@ -1,4 +1,4 @@
-import pool from "../db.js"; // تأكد إن مكان pool صحيح
+import pool from "../db.js";
 
 export const getPatientReports = async (req, res) => {
   try {
@@ -8,13 +8,19 @@ export const getPatientReports = async (req, res) => {
       return res.status(400).json({ message: "National ID required" });
     }
 
-    // جلب المواعيد + النتائج المرتبطة بكل موعد
     const result = await pool.query(
       `SELECT 
           a.*,
-          json_agg(r.*) FILTER (WHERE r.id IS NOT NULL) AS result
+          json_agg(r.*) FILTER (WHERE r.id IS NOT NULL) AS result,
+          -- جمع المدفوعات لكل نتيجة
+          json_agg(p.*) FILTER (WHERE p.id IS NOT NULL) AS payments
        FROM appointments a
        LEFT JOIN result r ON a.id = r."appointmentId"
+       LEFT JOIN LATERAL (
+           SELECT *
+           FROM payments p
+           WHERE p."sessionId" = r.id
+       ) p ON true
        WHERE a."nationalId" = $1
        GROUP BY a.id
        ORDER BY a."createdAt" DESC`,

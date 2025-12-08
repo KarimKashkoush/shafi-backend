@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
+
 const { registerUser, getUser, getAllUsers, updateUser } = require("../controllers/authController");
 const { login } = require("../controllers/login");
 const { addReport } = require("../controllers/addReport");
@@ -10,6 +11,7 @@ const { getFile } = require("../controllers/getFile");
 const { getAllDoctors } = require("../controllers/getAllDoctors");
 const { authenticateToken, requireRole, requireSelfOrRole } = require("../controllers/authenticateToken");
 const { addReceptionist, getReceptionists, updateReceptionistStatus, deleteReceptionist } = require('../controllers/receptionists');
+const { addPayment, getPaymentsByDoctor } = require("../controllers/payments");
 
 const multer = require("multer");
 const { addAppointment, addResultToAppointment, getAppointmentsWithResults, deleteAppointment, updateNationalId, getAppointmentById } = require("../controllers/addAppointment");
@@ -73,6 +75,13 @@ router.post("/addUserByAdmin", authenticateToken, requireRole('admin'), addUserB
 router.get("/getUserByAdmin", authenticateToken, requireRole('admin'), getAllUsersByAdmin);
 router.patch("/addUserByAdmin/:id", authenticateToken, requireRole('admin'), toggleUserStatus);
 router.post("/getUserById", authenticateToken, requireRole('admin'), getUserById);
+
+// إضافة دفعة جديدة
+router.post("/add", authenticateToken, requireRole('reception', 'doctor', 'admin'), addPayment);
+
+// استرجاع المدفوعات + المتبقي لكل مريض عند دكتور معين
+router.get("/by-doctor/:doctorId", authenticateToken, requireRole('doctor', 'admin'), getPaymentsByDoctor);
+
 
 
 
