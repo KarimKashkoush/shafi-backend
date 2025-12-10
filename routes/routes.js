@@ -46,12 +46,12 @@ router.get("/allUsers", getAllUsers);
 router.put("/user/:id", authenticateToken, requireSelfOrRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), updateUser);
 
 // ✅ Appointments
-router.post("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception', 'clinic_reception'), addAppointment);
-router.get("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception', 'clinic_reception'), getAppointmentsWithResults);
+router.post("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology','receptionist', 'medicalCenter'), addAppointment);
+router.get("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology','receptionist', 'medicalCenter'), getAppointmentsWithResults);
 router.get("/appointment/:id", getAppointmentById);
-router.put("/appointments/:id/nationalId", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception', 'clinic_reception'), updateNationalId);
-router.delete("/appointments/:id", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception', 'clinic_reception'), deleteAppointment);
-router.post("/appointments/:id/addResultAppointment", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception', 'clinic_reception'), upload.array("files", 5), addResultToAppointment);
+router.put("/appointments/:id/nationalId", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology','receptionist', 'medicalCenter'), updateNationalId);
+router.delete("/appointments/:id", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology','receptionist', 'medicalCenter'), deleteAppointment);
+router.post("/appointments/:id/addResultAppointment", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology','receptionist', 'medicalCenter'), upload.array("files", 5), addResultToAppointment);
 
 // ✅ Reports & Results
 router.post("/addReport", authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology'), addReport);
@@ -65,10 +65,10 @@ router.get("/files/:key", authenticateToken, getFile);
 router.get("/checkExistingResult", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), checkExistingResult);
 
 // receptionists
-router.post('/addReceptionists', authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology'), addReceptionist);
-router.get('/getReceptionists', authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology'), getReceptionists);
-router.patch('/updateReceptionistStatus/:id', authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology'), updateReceptionistStatus);
-router.delete('/deleteReceptionist/:id', authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology'), deleteReceptionist);
+router.post('/addReceptionists', authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology', 'medicalCenter'), addReceptionist);
+router.get('/getReceptionists', authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology', 'medicalCenter'), getReceptionists);
+router.patch('/updateReceptionistStatus/:id', authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology', 'medicalCenter'), updateReceptionistStatus);
+router.delete('/deleteReceptionist/:id', authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology', 'medicalCenter'), deleteReceptionist);
 
 // Admin - Add User
 router.post("/addUserByAdmin", authenticateToken, requireRole('admin'), addUserByAdmin);
@@ -77,7 +77,7 @@ router.patch("/addUserByAdmin/:id", authenticateToken, requireRole('admin'), tog
 router.post("/getUserById", authenticateToken, requireRole('admin'), getUserById);
 
 // إضافة دفعة جديدة
-router.post("/add", authenticateToken, requireRole('reception', 'doctor', 'admin'), addPayment);
+router.post("/addPayment", authenticateToken, addPayment);
 
 // استرجاع المدفوعات + المتبقي لكل مريض عند دكتور معين
 router.get("/by-doctor/:doctorId", authenticateToken, requireRole('doctor', 'admin'), getPaymentsByDoctor);

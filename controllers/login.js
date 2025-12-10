@@ -3,36 +3,27 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
 const JWT_SECRET = process.env.JWT_SECRET;
-
 async function login(req, res) {
       const { email, phoneNumber, password } = req.body;
-
       const loginValue = email || phoneNumber;
 
-      if (!loginValue || !password) {
+      if (!loginValue || !password)
             return res.status(400).json({ message: "يرجى إدخال البريد الإلكتروني أو رقم الهاتف وكلمة المرور" });
-      }
 
       try {
-            // جلب بيانات المستخدم + creatorId لو موجود في receptionists
             const userQuery = await pool.query(
-                  `SELECT u.*, r."creatorId"
-             FROM "users" u
-             LEFT JOIN "receptionists" r ON u.id = r."receptionistId"
-             WHERE u.email = $1 OR u."phoneNumber" = $1`,
+                  `SELECT * FROM users WHERE email = $1 OR "phoneNumber" = $1`,
                   [loginValue]
             );
 
-            if (userQuery.rows.length === 0) {
+            if (userQuery.rows.length === 0)
                   return res.status(400).json({ message: 'المستخدم غير موجود' });
-            }
 
             const user = userQuery.rows[0];
             const isMatch = await bcrypt.compare(password, user.password);
 
-            if (!isMatch) {
+            if (!isMatch)
                   return res.status(400).json({ message: 'كلمة المرور غير صحيحة' });
-            }
 
             const token = jwt.sign(
                   { userId: user.id, role: user.role },
@@ -51,7 +42,8 @@ async function login(req, res) {
                         phoneNumber: user.phoneNumber,
                         role: user.role,
                         gender: user.gender,
-                        creatorId: user.creatorId || null
+                        medicalCenterId: user.medicalCenterId,
+                        specialty: user.specialty || null
                   }
             });
 
@@ -60,5 +52,6 @@ async function login(req, res) {
             res.status(500).json({ message: 'error', error: err.message });
       }
 }
+
 
 module.exports = { login };

@@ -33,3 +33,4 @@ export const getPatientReports = async (req, res) => {
     res.status(500).json({ message: "error", error: error.message });
   }
 };
+
