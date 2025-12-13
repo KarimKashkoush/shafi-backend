@@ -11,6 +11,8 @@ const addAppointment = async (req, res) => {
             const testName = req.body.testName || null;
             const doctorId = req.body.doctorId || null;
             const dateTime = req.body.dateTime || null;
+            const isRevisit = req.body.isRevisit || false;
+
 
             // الحقول الجديدة
             const birthDate = req.body.birthDate || null;
@@ -45,12 +47,13 @@ const addAppointment = async (req, res) => {
 
             const query = `
             INSERT INTO appointments 
-            ("userId", "caseName", "phone", "nationalId", "testName", "doctorId", "medicalCenterId", "dateTime",
-            "birthDate", "hasChronicDisease", "chronicDiseaseDetails", "price")
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            ("userId", "caseName", "phone", "nationalId", "testName", "doctorId",
+ "medicalCenterId", "dateTime", "birthDate", "hasChronicDisease",
+ "chronicDiseaseDetails", "price", "isRevisit")
+
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING *;
             `;
-
             const values = [
                   userId,
                   caseName,
@@ -63,8 +66,10 @@ const addAppointment = async (req, res) => {
                   normalizedBirthDate,
                   hasChronicDisease,
                   chronicDiseaseDetails,
-                  price
+                  price,
+                  isRevisit
             ];
+
 
             const result = await pool.query(query, values);
 
@@ -80,14 +85,14 @@ const addAppointment = async (req, res) => {
 const addResultToAppointment = async (req, res) => {
       try {
             const { id } = req.params; // appointmentId
-            const { userId, report, nextAction, sessionCost } = req.body;
+            const { userId, report, nextAction, sessionCost, medicalCenterId } = req.body;
 
             if (!userId) return res.status(400).json({ message: "userId (الدكتور) مطلوب" });
 
             // هات بيانات الحجز
             const apptRes = await pool.query(
                   `SELECT "caseName", "phone", "nationalId", "testName"
-             FROM appointments WHERE id = $1`,
+       FROM appointments WHERE id = $1`,
                   [id]
             );
 
@@ -108,10 +113,10 @@ const addResultToAppointment = async (req, res) => {
 
             // إدخال النتيجة مرتبطة بالحجز
             const query = `
-            INSERT INTO result ("appointmentId", "doctorId", "caseName", "phone", "nationalId", "testName", "files", "report", "nextAction", "sessionCost")
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            RETURNING *
-        `;
+      INSERT INTO result ("appointmentId", "doctorId", "caseName", "phone", "nationalId", "testName", "files", "report", "nextAction", "sessionCost", "medicalCenterId")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING *
+    `;
 
             const values = [
                   id,
@@ -123,7 +128,8 @@ const addResultToAppointment = async (req, res) => {
                   JSON.stringify(uploadedFiles),
                   report || null,
                   nextAction || null,
-                  sessionCost || null
+                  sessionCost || null,
+                  medicalCenterId || null  // هنا ضفنا medicalCenterId
             ];
 
             const resultInsert = await pool.query(query, values);
@@ -137,11 +143,12 @@ const addResultToAppointment = async (req, res) => {
       }
 };
 
+
 // ✅ 3. عرض كل الحجوزات مع النتائج
 const getAppointmentsWithResults = async (req, res) => {
       try {
             const query = `
-        SELECT 
+      SELECT 
             a.id,
             a."userId",
             a."caseName",
@@ -153,19 +160,23 @@ const getAppointmentsWithResults = async (req, res) => {
             a."birthDate",
             a."hasChronicDisease",
             a."chronicDiseaseDetails",
+            a.price,
+            a."isRevisit",
 
             r.files AS "resultFiles",
             r."createdAt" AS "resultCreatedAt",
             r."sessionCost" AS "sessionCost",
+            r."report" AS "resultReports",
+
 
             d.id AS "doctorId",
             u.id AS "doctorUserId"
-        FROM appointments a
-        LEFT JOIN result r ON a.id = r."appointmentId"
-        LEFT JOIN doctors d ON a."doctorId" = d.id
-        LEFT JOIN users u ON d."userId" = u.id
-        ORDER BY a."createdAt" DESC;
-        `;
+      FROM appointments a
+      LEFT JOIN result r ON a.id = r."appointmentId"
+      LEFT JOIN doctors d ON a."doctorId" = d.id
+      LEFT JOIN users u ON d."userId" = u.id
+      ORDER BY a."createdAt" DESC;
+      `;
 
             const result = await pool.query(query);
             res.json({ message: "success", data: result.rows });
@@ -180,8 +191,11 @@ const deleteAppointment = async (req, res) => {
       try {
             const { id } = req.params;
 
-            // الأول نمسح أي نتيجة مرتبطة بالحجز
+            // أولاً نمسح أي نتائج مرتبطة بالحجز
             await pool.query(`DELETE FROM result WHERE "appointmentId" = $1`, [id]);
+
+            // نمسح أي مدفوعات مرتبطة بالحجز
+            await pool.query(`DELETE FROM payments WHERE "appointmentId" = $1`, [id]);
 
             // بعدين نمسح الحجز نفسه
             const query = `DELETE FROM appointments WHERE id = $1 RETURNING *`;
@@ -191,12 +205,17 @@ const deleteAppointment = async (req, res) => {
                   return res.status(404).json({ message: "الحجز غير موجود" });
             }
 
-            res.json({ message: "تم حذف الحجز بنجاح", data: result.rows[0] });
+            res.json({
+                  message: "تم حذف الحجز بنجاح مع النتائج والمدفوعات المرتبطة",
+                  data: result.rows[0]
+            });
       } catch (error) {
             console.error("❌ Error in deleteAppointment:", error);
             res.status(500).json({ message: "error", error: error.message });
       }
 };
+
+
 
 // ✅ 5. تعديل أو إضافة الرقم القومي لحجز
 const updateNationalId = async (req, res) => {
@@ -210,7 +229,7 @@ const updateNationalId = async (req, res) => {
 
             const query = `
             UPDATE appointments
-            SET "nationalId" = $1
+            SET "nationalId" = $1 
             WHERE id = $2
             RETURNING *;
         `;
@@ -251,6 +270,7 @@ const getAppointmentById = async (req, res) => {
       LEFT JOIN result r ON a.id = r."appointmentId"
       LEFT JOIN doctors d ON a."doctorId" = d.id
       LEFT JOIN users u ON d."userId" = u.id
+      LEFT JOIN payments p ON a.id = p."appointmentId"
       WHERE a.id = $1
       LIMIT 1
     `;

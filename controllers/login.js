@@ -42,7 +42,7 @@ async function login(req, res) {
                         phoneNumber: user.phoneNumber,
                         role: user.role,
                         gender: user.gender,
-                        medicalCenterId: user.medicalCenterId,
+                        medicalCenterId: user.medicalCenterId || user.id,
                         specialty: user.specialty || null
                   }
             });

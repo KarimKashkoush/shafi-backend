@@ -2,58 +2,53 @@ const pool = require("../db");
 
 // إضافة دفعة جديدة
 async function addPayment(req, res) {
-      try {
-            const { patientNationalId, doctorId, sessionId, amount, paymentMethod, notes } = req.body;
+    try {
+        const { patientNationalId, doctorId, sessionId, appointmentId, amount, paymentMethod, notes, medicalCenterId } = req.body;
 
-            if (!patientNationalId || !doctorId || !amount) {
-                  return res.status(400).json({ error: "patientNationalId, doctorId, and amount are required" });
+        if (!patientNationalId || !doctorId || !amount || !medicalCenterId || !appointmentId) {
+            return res.status(400).json({ 
+                error: "patientNationalId, doctorId, amount, medicalCenterId, and appointmentId are required" 
+            });
+        }
+
+        const result = await pool.query(
+            `INSERT INTO payments 
+            ("patientNationalId", "doctorId", "sessionId", "appointmentId", "amount", "paymentMethod", "notes", "medicalCenterId")
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            RETURNING "patientNationalId", "doctorId", "sessionId", "appointmentId", "amount", "paymentMethod", "notes", "medicalCenterId"`,
+            [patientNationalId, doctorId, sessionId || null, appointmentId, amount, paymentMethod || null, notes || null, medicalCenterId]
+        );
+
+        res.status(201).json({ success: true, payment: result.rows[0] });
+    } catch (error) {
+        console.error("Database error:", error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
+
+const getPaymentsByMedicalCenter = async (req, res) => {
+      try {
+            const { medicalCenterId } = req.params;
+
+            if (!medicalCenterId) {
+                  return res.status(400).json({ error: "medicalCenterId مطلوب" });
             }
 
-const result = await pool.query(
-      `INSERT INTO payments ("patientNationalId", "doctorId", "sessionId", "amount", "paymentMethod", "notes")
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING "patientNationalId", "doctorId", "sessionId", "amount", "paymentMethod", "notes"`,
-      [patientNationalId, doctorId, sessionId || null, amount, paymentMethod || null, notes || null]
-);
-
-
-
-            res.status(201).json({ success: true, payment: result.rows[0] });
-      } catch (error) {
-            console.error("Database error:", error);
-            res.status(500).json({ error: error.message });
-      }
-}
-
-// استرجاع المدفوعات + المتبقي لكل مريض عند دكتور معين
-async function getPaymentsByDoctor(req, res) {
-      try {
-            const { doctorId } = req.params;
-
-            const paymentsData = await pool.query(
-                  `SELECT 
-            r.patientId,
-            up.name AS patientName,
-            r.doctorId,
-            ud.name AS doctorName,
-            SUM(r."sessionCost") AS totalAmount,
-            COALESCE(SUM(p.amount), 0) AS totalPaid,
-            SUM(r."sessionCost") - COALESCE(SUM(p.amount), 0) AS remainingAmount
-            FROM result r
-            LEFT JOIN payments p
-            ON r.patientId = p.patientId AND r.doctorId = p.doctorId
-            LEFT JOIN users up ON r.patientId = up.id
-            LEFT JOIN users ud ON r.doctorId = ud.id
-            WHERE r.doctorId = $1
-            GROUP BY r.patientId, up.name, r.doctorId, ud.name`,
-                  [doctorId]
+            const result = await pool.query(
+                  `SELECT *
+       FROM payments
+       WHERE "medicalCenterId" = $1
+       ORDER BY "paymentdate" DESC`,
+                  [medicalCenterId]
             );
 
-            res.json(paymentsData.rows);
+            res.status(200).json({ success: true, payments: result.rows });
       } catch (error) {
-            console.error("Database error:", error);
+            console.error("❌ Error fetching payments:", error);
             res.status(500).json({ error: error.message });
       }
-}
+};
 
-module.exports = { addPayment, getPaymentsByDoctor };
+
+module.exports = { addPayment, getPaymentsByMedicalCenter };

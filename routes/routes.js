@@ -11,7 +11,7 @@ const { getFile } = require("../controllers/getFile");
 const { getAllDoctors } = require("../controllers/getAllDoctors");
 const { authenticateToken, requireRole, requireSelfOrRole } = require("../controllers/authenticateToken");
 const { addReceptionist, getReceptionists, updateReceptionistStatus, deleteReceptionist } = require('../controllers/receptionists');
-const { addPayment, getPaymentsByDoctor } = require("../controllers/payments");
+const { addPayment, getPaymentsByMedicalCenter } = require("../controllers/payments");
 
 const multer = require("multer");
 const { addAppointment, addResultToAppointment, getAppointmentsWithResults, deleteAppointment, updateNationalId, getAppointmentById } = require("../controllers/addAppointment");
@@ -46,12 +46,12 @@ router.get("/allUsers", getAllUsers);
 router.put("/user/:id", authenticateToken, requireSelfOrRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), updateUser);
 
 // ✅ Appointments
-router.post("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology','receptionist', 'medicalCenter'), addAppointment);
-router.get("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology','receptionist', 'medicalCenter'), getAppointmentsWithResults);
+router.post("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), addAppointment);
+router.get("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), getAppointmentsWithResults);
 router.get("/appointment/:id", getAppointmentById);
-router.put("/appointments/:id/nationalId", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology','receptionist', 'medicalCenter'), updateNationalId);
-router.delete("/appointments/:id", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology','receptionist', 'medicalCenter'), deleteAppointment);
-router.post("/appointments/:id/addResultAppointment", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology','receptionist', 'medicalCenter'), upload.array("files", 5), addResultToAppointment);
+router.put("/appointments/:id/nationalId", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), updateNationalId);
+router.delete("/appointments/:id", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), deleteAppointment);
+router.post("/appointments/:id/addResultAppointment", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), upload.array("files", 5), addResultToAppointment);
 
 // ✅ Reports & Results
 router.post("/addReport", authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology'), addReport);
@@ -76,11 +76,16 @@ router.get("/getUserByAdmin", authenticateToken, requireRole('admin'), getAllUse
 router.patch("/addUserByAdmin/:id", authenticateToken, requireRole('admin'), toggleUserStatus);
 router.post("/getUserById", authenticateToken, requireRole('admin'), getUserById);
 
-// إضافة دفعة جديدة
-router.post("/addPayment", authenticateToken, addPayment);
 
-// استرجاع المدفوعات + المتبقي لكل مريض عند دكتور معين
-router.get("/by-doctor/:doctorId", authenticateToken, requireRole('doctor', 'admin'), getPaymentsByDoctor);
+// Payments
+router.post("/addPayment", authenticateToken, addPayment);
+// فرضًا عندك authenticateToken و requireRole جاهزين
+router.get(
+      "/getPaymentsByMedicalCenter/:medicalCenterId",
+      authenticateToken,
+      requireRole("doctor", "admin", "medicalCenter"),
+      getPaymentsByMedicalCenter
+);
 
 
 
@@ -91,6 +96,13 @@ router.get("/doctor/patientFiles/:nationalId", getPatientReports);
 
 // Doctors
 router.get("/doctors", authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception'), getAllDoctors);
+
+
+const { getS3Usage } = require("../controllers/s3Size.js");
+const { getRDSUsage } = require("../controllers/databaseSize.js");
+router.get("/s3-usage", getS3Usage);
+router.get("/getRDSUsage", getRDSUsage);
+
 
 module.exports = router;
 
