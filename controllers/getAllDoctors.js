@@ -1,6 +1,6 @@
-import pool from "../db.js";
+const pool = require("../db");
 
-export const getAllDoctors = async (req, res) => {
+const getAllDoctors = async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT 
@@ -20,3 +20,5 @@ export const getAllDoctors = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+module.exports = { getAllDoctors };

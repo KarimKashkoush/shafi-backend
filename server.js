@@ -43,4 +43,30 @@ pool.query('SELECT NOW()', (err, result) => {
       }
 });
 
-app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
+// Start server
+const server = app.listen(PORT, '0.0.0.0', () => {
+      console.log(`✅ Server running on port ${PORT}`);
+});
+
+// Graceful shutdown for PM2
+process.on('SIGTERM', () => {
+      console.log('SIGTERM signal received: closing HTTP server');
+      server.close(() => {
+            console.log('HTTP server closed');
+            pool.end(() => {
+                  console.log('Database pool closed');
+                  process.exit(0);
+            });
+      });
+});
+
+process.on('SIGINT', () => {
+      console.log('SIGINT signal received: closing HTTP server');
+      server.close(() => {
+            console.log('HTTP server closed');
+            pool.end(() => {
+                  console.log('Database pool closed');
+                  process.exit(0);
+            });
+      });
+});

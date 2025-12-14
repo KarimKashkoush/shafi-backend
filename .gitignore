@@ -1,5 +1,27 @@
 node_modules
 # Keep environment variables out of version control
 .env
+.env.local
+.env.production
 
+# Prisma generated files
 /generated/prisma
+
+# Uploads directory (contains user files)
+uploads/
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

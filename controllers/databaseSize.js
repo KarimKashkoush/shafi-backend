@@ -1,10 +1,10 @@
-import { RDSClient, DescribeDBInstancesCommand } from "@aws-sdk/client-rds";
-import { CloudWatchClient, GetMetricStatisticsCommand } from "@aws-sdk/client-cloudwatch";
+const { RDSClient, DescribeDBInstancesCommand } = require("@aws-sdk/client-rds");
+const { CloudWatchClient, GetMetricStatisticsCommand } = require("@aws-sdk/client-cloudwatch");
 
 const rds = new RDSClient({ region: "eu-north-1" });
 const cloudwatch = new CloudWatchClient({ region: "eu-north-1" });
 
-export const getRDSUsage = async (req, res) => {
+const getRDSUsage = async (req, res) => {
       try {
             const DBInstanceIdentifier = "shafi-db";
 
@@ -52,3 +52,5 @@ export const getRDSUsage = async (req, res) => {
             res.status(500).json({ message: "error", error: error.message });
       }
 };
+
+module.exports = { getRDSUsage };

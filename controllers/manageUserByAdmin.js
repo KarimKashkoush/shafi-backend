@@ -1,5 +1,5 @@
-import bcrypt from "bcryptjs";
-import db from "../db.js";
+const bcrypt = require("bcryptjs");
+const db = require("../db");
 
 // ✅ إضافة مستخدم بواسطة الأدمن
 async function addUserByAdmin(req, res) {
@@ -114,4 +114,4 @@ async function toggleUserStatus(req, res) {
       }
 }
 
-export { addUserByAdmin, getAllUsersByAdmin, getUserById, toggleUserStatus };
+module.exports = { addUserByAdmin, getAllUsersByAdmin, getUserById, toggleUserStatus };

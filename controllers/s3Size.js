@@ -1,8 +1,8 @@
-import { S3Client, ListObjectsV2Command } from "@aws-sdk/client-s3";
+const { S3Client, ListObjectsV2Command } = require("@aws-sdk/client-s3");
 
 const s3 = new S3Client({ region: process.env.AWS_REGION });
 
-export const getS3Usage = async (req, res) => {
+const getS3Usage = async (req, res) => {
       try {
             const bucketName = 'shafi-storage';
 
@@ -40,3 +40,5 @@ export const getS3Usage = async (req, res) => {
             res.status(500).json({ message: "error", error: error.message });
       }
 };
+
+module.exports = { getS3Usage };

@@ -1,6 +1,6 @@
-import pool from "../db.js";
+const pool = require("../db");
 
-export const getPatientReports = async (req, res) => {
+const getPatientReports = async (req, res) => {
   try {
     const { nationalId } = req.params;
 
@@ -33,4 +33,6 @@ export const getPatientReports = async (req, res) => {
     res.status(500).json({ message: "error", error: error.message });
   }
 };
+
+module.exports = { getPatientReports };
 
