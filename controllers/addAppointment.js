@@ -143,7 +143,6 @@ const addResultToAppointment = async (req, res) => {
       }
 };
 
-
 // ✅ 3. عرض كل الحجوزات مع النتائج
 const getAppointmentsWithResults = async (req, res) => {
       try {
@@ -186,6 +185,40 @@ const getAppointmentsWithResults = async (req, res) => {
       }
 };
 
+// controllers/addAppointment.js
+const getAppointmentsForDashboard = async (req, res) => {
+      try {
+            const { id } = req.params; // ده هيبقى userId
+
+            const query = `
+SELECT 
+    a.id,
+    a."caseName",
+    a."dateTime",
+    a.price,
+    r."sessionCost",
+    r."doctorId",
+    u."fullName" AS "doctorName",
+    r."report" AS "report",
+    r."createdAt" AS "createdAt"
+FROM appointments a
+LEFT JOIN result r ON a.id = r."appointmentId"
+LEFT JOIN users u ON r."doctorId" = u.id
+WHERE a."userId" = $1
+ORDER BY a."createdAt" DESC;
+
+      `;
+
+            const result = await pool.query(query, [id]);
+            res.json({ message: "success", data: result.rows });
+      } catch (error) {
+            console.error("❌ Error in getAppointmentsForDashboard:", error);
+            res.status(500).json({ message: "error", error: error.message });
+      }
+};
+
+
+
 // ✅ 4. حذف حجز بالـ id
 const deleteAppointment = async (req, res) => {
       try {
@@ -214,7 +247,6 @@ const deleteAppointment = async (req, res) => {
             res.status(500).json({ message: "error", error: error.message });
       }
 };
-
 
 
 // ✅ 5. تعديل أو إضافة الرقم القومي لحجز
@@ -294,5 +326,6 @@ module.exports = {
       getAppointmentsWithResults,
       deleteAppointment,
       updateNationalId,
-      getAppointmentById
+      getAppointmentById,
+      getAppointmentsForDashboard
 };

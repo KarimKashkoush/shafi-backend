@@ -14,7 +14,7 @@ const { addReceptionist, getReceptionists, updateReceptionistStatus, deleteRecep
 const { addPayment, getPaymentsByMedicalCenter } = require("../controllers/payments");
 
 const multer = require("multer");
-const { addAppointment, addResultToAppointment, getAppointmentsWithResults, deleteAppointment, updateNationalId, getAppointmentById } = require("../controllers/addAppointment");
+const { addAppointment, addResultToAppointment, getAppointmentsWithResults, deleteAppointment, updateNationalId, getAppointmentById, getAppointmentsForDashboard } = require("../controllers/addAppointment");
 const { checkExistingResult } = require("../controllers/checkExistingResult");
 const { getAllResults } = require("../controllers/getResults");
 const { getResultsByNationalId } = require("../controllers/getResultsByNationalId");
@@ -48,6 +48,7 @@ router.put("/user/:id", authenticateToken, requireSelfOrRole('patient', 'doctor'
 // ✅ Appointments
 router.post("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), addAppointment);
 router.get("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), getAppointmentsWithResults);
+router.get("/getAppointmentsForDashboard/:id", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), getAppointmentsForDashboard);
 router.get("/appointment/:id", getAppointmentById);
 router.put("/appointments/:id/nationalId", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), updateNationalId);
 router.delete("/appointments/:id", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), deleteAppointment);

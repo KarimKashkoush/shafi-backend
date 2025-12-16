@@ -6,8 +6,8 @@ async function addPayment(req, res) {
         const { patientNationalId, doctorId, sessionId, appointmentId, amount, paymentMethod, notes, medicalCenterId } = req.body;
 
         if (!patientNationalId || !doctorId || !amount || !medicalCenterId || !appointmentId) {
-            return res.status(400).json({ 
-                error: "patientNationalId, doctorId, amount, medicalCenterId, and appointmentId are required" 
+            return res.status(400).json({
+                error: "patientNationalId, doctorId, amount, medicalCenterId, and appointmentId are required"
             });
         }
 
@@ -28,26 +28,26 @@ async function addPayment(req, res) {
 
 
 const getPaymentsByMedicalCenter = async (req, res) => {
-      try {
-            const { medicalCenterId } = req.params;
+    try {
+        const { medicalCenterId } = req.params;
 
-            if (!medicalCenterId) {
-                  return res.status(400).json({ error: "medicalCenterId مطلوب" });
-            }
+        if (!medicalCenterId) {
+            return res.status(400).json({ error: "medicalCenterId مطلوب" });
+        }
 
-            const result = await pool.query(
-                  `SELECT *
-       FROM payments
-       WHERE "medicalCenterId" = $1
-       ORDER BY "paymentdate" DESC`,
-                  [medicalCenterId]
-            );
+        const result = await pool.query(
+            `SELECT *
+            FROM payments
+            WHERE "medicalCenterId" = $1
+            ORDER BY "paymentdate" DESC`,
+            [medicalCenterId]
+        );
 
-            res.status(200).json({ success: true, payments: result.rows });
-      } catch (error) {
-            console.error("❌ Error fetching payments:", error);
-            res.status(500).json({ error: error.message });
-      }
+        res.status(200).json({ success: true, payments: result.rows });
+    } catch (error) {
+        console.error("❌ Error fetching payments:", error);
+        res.status(500).json({ error: error.message });
+    }
 };
 
 
