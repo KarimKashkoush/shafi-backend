@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 
-const { registerUser, getUser, getAllUsers, updateUser } = require("../controllers/authController");
+const { registerUser, getUser, getAllUsers, updateUser, changePassword } = require("../controllers/authController");
 const { login } = require("../controllers/login");
 const { addReport } = require("../controllers/addReport");
 const { addResult } = require("../controllers/addResult");
@@ -44,6 +44,7 @@ router.post("/login", login);
 router.get("/user/:id", authenticateToken, requireSelfOrRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), getUser);
 router.get("/allUsers", getAllUsers);
 router.put("/user/:id", authenticateToken, requireSelfOrRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology'), updateUser);
+router.put("/users/:id/change-password", changePassword);
 
 // ✅ Appointments
 router.post("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), addAppointment);

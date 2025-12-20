@@ -160,4 +160,43 @@ async function updateUser(req, res) {
       }
 }
 
-module.exports = { registerUser, getAllUsers, getUser, updateUser };
+async function changePassword(req, res) {
+      const { id } = req.params;
+      const { currentPassword, newPassword } = req.body;
+
+      try {
+            const result = await pool.query(
+                  'SELECT password FROM users WHERE id = $1',
+                  [id]
+            );
+
+            if (result.rows.length === 0) {
+                  return res.status(404).json({ message: "المستخدم غير موجود" });
+            }
+
+            const user = result.rows[0];
+
+            const isMatch = await bcrypt.compare(currentPassword, user.password);
+            if (!isMatch) {
+                  return res.status(400).json({ message: "كلمة السر الحالية غير صحيحة" });
+            }
+
+            const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+            await pool.query(
+                  'UPDATE users SET password = $1 WHERE id = $2',
+                  [hashedPassword, id]
+            );
+
+            res.json({ message: "تم تغيير كلمة السر بنجاح" });
+      } catch (err) {
+            console.error(err);
+            res.status(500).json({ message: "خطأ في السيرفر" });
+      }
+}
+
+// Froget Password
+
+
+
+module.exports = { registerUser, getAllUsers, getUser, updateUser, changePassword };

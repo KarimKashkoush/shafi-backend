@@ -20,6 +20,11 @@ async function login(req, res) {
                   return res.status(400).json({ message: 'المستخدم غير موجود' });
 
             const user = userQuery.rows[0];
+            if (user.status === "false") {
+                  return res.status(403).json({
+                        message: "الحساب مجمد، برجاء التواصل مع الإدارة"
+                  });
+            }
             const isMatch = await bcrypt.compare(password, user.password);
 
             if (!isMatch)
@@ -43,7 +48,8 @@ async function login(req, res) {
                         role: user.role,
                         gender: user.gender,
                         medicalCenterId: user.medicalCenterId || user.id,
-                        specialty: user.specialty || null
+                        specialty: user.specialty || null,
+                        status: user.status
                   }
             });
 

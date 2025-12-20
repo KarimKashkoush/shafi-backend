@@ -80,8 +80,6 @@ const addAppointment = async (req, res) => {
       }
 };
 
-
-// ✅ 2. إضافة نتيجة لحجز موجود (upload files → S3 → save in result)
 const addResultToAppointment = async (req, res) => {
       try {
             const { id } = req.params; // appointmentId
@@ -143,7 +141,6 @@ const addResultToAppointment = async (req, res) => {
       }
 };
 
-// ✅ 3. عرض كل الحجوزات مع النتائج
 const getAppointmentsWithResults = async (req, res) => {
       try {
             const query = `
@@ -185,28 +182,27 @@ const getAppointmentsWithResults = async (req, res) => {
       }
 };
 
-// controllers/addAppointment.js
 const getAppointmentsForDashboard = async (req, res) => {
       try {
             const { id } = req.params; // ده هيبقى userId
 
             const query = `
 SELECT 
-    a.id,
-    a."caseName",
-    a."dateTime",
-    a.price,
-    r."sessionCost",
-    r."doctorId",
-    u."fullName" AS "doctorName",
-    r."report" AS "report",
-    r."createdAt" AS "createdAt"
-FROM appointments a
-LEFT JOIN result r ON a.id = r."appointmentId"
-LEFT JOIN users u ON r."doctorId" = u.id
-WHERE a."userId" = $1
-ORDER BY a."createdAt" DESC;
-
+      a.id,
+      a."caseName",
+      a."dateTime",
+      a.price,
+      a."isRevisit",
+      r."sessionCost",
+      r."doctorId",
+      u."fullName" AS "doctorName",
+      r."report" AS "report",
+      r."createdAt" AS "createdAt"
+      FROM appointments a
+      LEFT JOIN result r ON a.id = r."appointmentId"
+      LEFT JOIN users u ON r."doctorId" = u.id
+      WHERE a."userId" = $1
+      ORDER BY a."createdAt" DESC;
       `;
 
             const result = await pool.query(query, [id]);
@@ -217,20 +213,15 @@ ORDER BY a."createdAt" DESC;
       }
 };
 
-
-
 // ✅ 4. حذف حجز بالـ id
 const deleteAppointment = async (req, res) => {
       try {
             const { id } = req.params;
 
-            // أولاً نمسح أي نتائج مرتبطة بالحجز
             await pool.query(`DELETE FROM result WHERE "appointmentId" = $1`, [id]);
 
-            // نمسح أي مدفوعات مرتبطة بالحجز
             await pool.query(`DELETE FROM payments WHERE "appointmentId" = $1`, [id]);
 
-            // بعدين نمسح الحجز نفسه
             const query = `DELETE FROM appointments WHERE id = $1 RETURNING *`;
             const result = await pool.query(query, [id]);
 
@@ -249,7 +240,6 @@ const deleteAppointment = async (req, res) => {
 };
 
 
-// ✅ 5. تعديل أو إضافة الرقم القومي لحجز
 const updateNationalId = async (req, res) => {
       try {
             const { id } = req.params; // appointmentId
