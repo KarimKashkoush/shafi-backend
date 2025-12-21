@@ -15,7 +15,8 @@ const allowedOrigins = [
       "https://shafi-gilt.vercel.app",
       "https://shafi-front-end.vercel.app",
       "http://localhost:5173",
-      "https://www.shafi-healthcare.com"
+      "https://www.shafi-healthcare.com",
+      "https://shafi-healthcare.com"
 ];
 
 app.use(cors({
