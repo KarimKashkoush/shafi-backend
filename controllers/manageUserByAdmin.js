@@ -41,18 +41,22 @@ async function addUserByAdmin(req, res) {
 }
 
 // ✅ جلب جميع المستخدمين
-async function getAllUsersByAdmin(req, res) {
+async function getAllStafByAdmin(req, res) {
       try {
             const result = await db.query(
-                  `SELECT id, "fullName", email, "phoneNumber", role, gender, status, "lastUpdated"
-       FROM users ORDER BY "lastUpdated" DESC`
+                  `SELECT id, "fullName", email, "phoneNumber", role, gender, status, "createdAt"
+                  FROM users
+                  WHERE role IN ('medicalCenter', 'radiology', 'lab')
+                  ORDER BY "lastUpdated" DESC`
             );
+
             res.json({ users: result.rows });
       } catch (err) {
             console.error(err);
             res.status(500).json({ message: "حدث خطأ أثناء جلب المستخدمين" });
       }
 }
+
 
 // ✅ جلب مستخدم محدد بالـ ID
 async function getUserById(req, res) {
@@ -94,18 +98,20 @@ async function toggleUserStatus(req, res) {
 
             const result = await db.query(
                   `UPDATE users
-       SET status = NOT status, "lastUpdated" = NOW()
-       WHERE id = $1
-       RETURNING id, "fullName", status`,
+            SET status = CASE WHEN status = 'true' THEN 'false' ELSE 'true' END,
+            "lastUpdated" = NOW()
+            WHERE id = $1
+            RETURNING id, "fullName", status`,
                   [id]
             );
+
 
             if (result.rows.length === 0) {
                   return res.status(404).json({ message: "المستخدم غير موجود" });
             }
 
             const user = result.rows[0];
-            const statusMsg = user.status ? "تم تفعيل المستخدم" : "تم تجميد المستخدم";
+            const statusMsg = user.status ? "تم تجميد المستخدم" : "تم تفعيل المستخدم";
 
             res.json({ message: statusMsg, user });
       } catch (err) {
@@ -114,4 +120,4 @@ async function toggleUserStatus(req, res) {
       }
 }
 
-module.exports = { addUserByAdmin, getAllUsersByAdmin, getUserById, toggleUserStatus };
+module.exports = { addUserByAdmin, getAllStafByAdmin, getUserById, toggleUserStatus };

@@ -18,7 +18,7 @@ const { addAppointment, addResultToAppointment, getAppointmentsWithResults, dele
 const { checkExistingResult } = require("../controllers/checkExistingResult");
 const { getAllResults } = require("../controllers/getResults");
 const { getResultsByNationalId } = require("../controllers/getResultsByNationalId");
-const { addUserByAdmin, getAllUsersByAdmin, getUserById, toggleUserStatus } = require("../controllers/manageUserByAdmin");
+const { addUserByAdmin, getAllStafByAdmin, getUserById, toggleUserStatus } = require("../controllers/manageUserByAdmin");
 const { getPatientReports } = require("../controllers/doctorPatientReports");
 
 // Multer لتخزين الملفات في الذاكرة
@@ -74,8 +74,8 @@ router.delete('/deleteReceptionist/:id', authenticateToken, requireRole('doctor'
 
 // Admin - Add User
 router.post("/addUserByAdmin", authenticateToken, requireRole('admin'), addUserByAdmin);
-router.get("/getUserByAdmin", authenticateToken, requireRole('admin'), getAllUsersByAdmin);
-router.patch("/addUserByAdmin/:id", authenticateToken, requireRole('admin'), toggleUserStatus);
+router.get("/getAllStafByAdmin", authenticateToken, requireRole('admin'), getAllStafByAdmin);
+router.put("/toggleUserStatus/:id", authenticateToken, requireRole('admin'), toggleUserStatus);
 router.post("/getUserById", authenticateToken, requireRole('admin'), getUserById);
 
 
