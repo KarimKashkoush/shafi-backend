@@ -13,7 +13,7 @@ async function checkExistingResult(req, res) {
       WHERE test_name = $1 
       AND (phone = $2 OR national_id = $3)
       LIMIT 1
-    `;
+      `;
             const values = [testName, phone, nationalId || null];
 
             const result = await pool.query(query, values);

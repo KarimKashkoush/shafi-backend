@@ -14,16 +14,16 @@ const getPatientReports = async (req, res) => {
           json_agg(r.*) FILTER (WHERE r.id IS NOT NULL) AS result,
           -- جمع المدفوعات لكل نتيجة
           json_agg(p.*) FILTER (WHERE p.id IS NOT NULL) AS payments
-       FROM appointments a
-       LEFT JOIN result r ON a.id = r."appointmentId"
-       LEFT JOIN LATERAL (
+        FROM appointments a
+        LEFT JOIN result r ON a.id = r."appointmentId"
+        LEFT JOIN LATERAL (
            SELECT *
-           FROM payments p
-           WHERE p."sessionId" = r.id
-       ) p ON true
-       WHERE a."nationalId" = $1
-       GROUP BY a.id
-       ORDER BY a."createdAt" DESC`,
+            FROM payments p
+            WHERE p."sessionId" = r.id
+      ) p ON true
+      WHERE a."nationalId" = $1
+      GROUP BY a.id
+      ORDER BY a."createdAt" DESC`,
       [nationalId]
     );
 
