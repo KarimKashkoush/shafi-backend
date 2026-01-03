@@ -168,7 +168,7 @@ const getAppointmentsWithResults = async (req, res) => {
             d.id AS "doctorId",
             u.id AS "doctorUserId"
       FROM appointments a
-      LEFT JOIN result r ON a.id = r."appointmentId"
+      LEFT JOIN "patientsReports" r ON a.id = r."appointmentId"
       LEFT JOIN doctors d ON a."doctorId" = d.id
       LEFT JOIN users u ON d."userId" = u.id
       ORDER BY a."createdAt" DESC;
@@ -199,7 +199,7 @@ SELECT
       r."report" AS "report",
       r."createdAt" AS "createdAt"
       FROM appointments a
-      LEFT JOIN result r ON a.id = r."appointmentId"
+      LEFT JOIN "patientsReports" r ON a.id = r."appointmentId"
       LEFT JOIN users u ON r."doctorId" = u.id
       WHERE a."userId" = $1
       ORDER BY a."createdAt" DESC;
@@ -218,7 +218,7 @@ const deleteAppointment = async (req, res) => {
       try {
             const { id } = req.params;
 
-            await pool.query(`DELETE FROM result WHERE "appointmentId" = $1`, [id]);
+            await pool.query(`DELETE FROM "patientsReports" WHERE "appointmentId" = $1`, [id]);
 
             await pool.query(`DELETE FROM payments WHERE "appointmentId" = $1`, [id]);
 
@@ -289,7 +289,7 @@ const getAppointmentById = async (req, res) => {
         u."phoneNumber" AS "doctorPhone",
         d.specialty AS "doctorSpecialty"
       FROM appointments a
-      LEFT JOIN result r ON a.id = r."appointmentId"
+      LEFT JOIN "patientsReports" r ON a.id = r."appointmentId"
       LEFT JOIN doctors d ON a."doctorId" = d.id
       LEFT JOIN users u ON d."userId" = u.id
       LEFT JOIN payments p ON a.id = p."appointmentId"
