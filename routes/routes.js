@@ -92,7 +92,7 @@ router.get(
 
 
 
-router.get("/doctor/patientFiles/:nationalId", getPatientReports);
+router.get("/doctor/patientFiles/:identifier", getPatientReports);
 
 
 

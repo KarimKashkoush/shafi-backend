@@ -3,28 +3,36 @@ const pool = require("../db");
 // إضافة دفعة جديدة
 async function addPayment(req, res) {
     try {
-        const { patientNationalId, doctorId, sessionId, appointmentId, amount, paymentMethod, notes, medicalCenterId } = req.body;
+        const {
+            patientNationalId,
+            patientPhone,
+            doctorId,
+            sessionId,
+            appointmentId,
+            amount,
+            paymentMethod,
+            notes,
+            medicalCenterId
+        } = req.body;
 
-        if (!patientNationalId || !doctorId || !amount || !medicalCenterId || !appointmentId) {
-            return res.status(400).json({
-                error: "patientNationalId, doctorId, amount, medicalCenterId, and appointmentId are required"
-            });
-        }
+        if (!doctorId || !amount || !medicalCenterId || !appointmentId)
+            return res.status(400).json({ error: "doctorId, amount, medicalCenterId, appointmentId required" });
 
         const result = await pool.query(
-            `INSERT INTO payments 
-            ("patientNationalId", "doctorId", "sessionId", "appointmentId", "amount", "paymentMethod", "notes", "medicalCenterId")
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            RETURNING "patientNationalId", "doctorId", "sessionId", "appointmentId", "amount", "paymentMethod", "notes", "medicalCenterId"`,
-            [patientNationalId, doctorId, sessionId || null, appointmentId, amount, paymentMethod || null, notes || null, medicalCenterId]
+            `INSERT INTO payments
+            ("patientNationalId", "patientPhone", "doctorId", "sessionId", "appointmentId", "amount", "paymentMethod", "notes", "medicalCenterId")
+            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+            RETURNING *`,
+            [patientNationalId || null, patientPhone || null, doctorId, sessionId || null, appointmentId, amount, paymentMethod || null, notes || null, medicalCenterId]
         );
 
         res.status(201).json({ success: true, payment: result.rows[0] });
     } catch (error) {
-        console.error("Database error:", error);
+        console.error(error);
         res.status(500).json({ error: error.message });
     }
 }
+
 
 
 const getPaymentsByMedicalCenter = async (req, res) => {

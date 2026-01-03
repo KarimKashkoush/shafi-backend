@@ -80,6 +80,17 @@ const addAppointment = async (req, res) => {
       }
 };
 
+
+const { S3Client, DeleteObjectCommand } = require("@aws-sdk/client-s3");
+
+const s3 = new S3Client({
+      region: process.env.AWS_REGION,
+      credentials: {
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      },
+});
+
 const addResultToAppointment = async (req, res) => {
       try {
             const { id } = req.params; // appointmentId
@@ -111,7 +122,7 @@ const addResultToAppointment = async (req, res) => {
 
             // إدخال النتيجة مرتبطة بالحجز
             const query = `
-      INSERT INTO result ("appointmentId", "doctorId", "caseName", "phone", "nationalId", "testName", "files", "report", "nextAction", "sessionCost", "medicalCenterId")
+      INSERT INTO "patientsReports" ("appointmentId", "doctorId", "caseName", "phone", "nationalId", "testName", "files", "report", "nextAction", "sessionCost", "medicalCenterId")
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *
     `;
@@ -218,52 +229,92 @@ const deleteAppointment = async (req, res) => {
       try {
             const { id } = req.params;
 
+            // 1️⃣ جلب ملفات النتائج من DB
+            const { rows: reports } = await pool.query(
+                  `SELECT files FROM "patientsReports" WHERE "appointmentId" = $1`,
+                  [id]
+            );
+
+            // 2️⃣ حذف كل ملف من S3
+            for (const report of reports) {
+                  if (report.files) {
+                        // لو files عبارة عن array بالفعل
+                        let filesArray = [];
+                        if (Array.isArray(report.files)) {
+                              filesArray = report.files;
+                        } else if (typeof report.files === "string") {
+                              // لو string، حاول تقسيمه على , أو خليه array من عنصر واحد
+                              try {
+                                    filesArray = JSON.parse(report.files);
+                              } catch {
+                                    filesArray = [report.files]; // بس خليها array من عنصر واحد
+                              }
+                        }
+
+                        for (const fileUrl of filesArray) {
+                              const key = fileUrl.split("amazonaws.com/")[1]; // بس اسم الملف بعد الباكت
+                              try {
+                                    await s3.send(new DeleteObjectCommand({
+                                          Bucket: process.env.AWS_BUCKET_NAME,
+                                          Key: key,
+                                    }));
+                                    console.log(`✅ Deleted file from S3: ${fileUrl}`);
+                              } catch (err) {
+                                    console.error(`❌ Failed to delete file ${fileUrl}:`, err);
+                              }
+                        }
+                  }
+            }
+
+
+            // 3️⃣ حذف السجلات من DB
             await pool.query(`DELETE FROM "patientsReports" WHERE "appointmentId" = $1`, [id]);
-
             await pool.query(`DELETE FROM payments WHERE "appointmentId" = $1`, [id]);
+            const { rows: deletedAppointments, rowCount } = await pool.query(
+                  `DELETE FROM appointments WHERE id = $1 RETURNING *`,
+                  [id]
+            );
 
-            const query = `DELETE FROM appointments WHERE id = $1 RETURNING *`;
-            const result = await pool.query(query, [id]);
-
-            if (result.rowCount === 0) {
+            if (rowCount === 0) {
                   return res.status(404).json({ message: "الحجز غير موجود" });
             }
 
             res.json({
-                  message: "تم حذف الحجز بنجاح مع النتائج والمدفوعات المرتبطة",
-                  data: result.rows[0]
+                  message: "تم حذف الحجز مع الملفات والنتائج والمدفوعات المرتبطة",
+                  data: deletedAppointments[0],
             });
       } catch (error) {
             console.error("❌ Error in deleteAppointment:", error);
             res.status(500).json({ message: "error", error: error.message });
       }
 };
-
-
 const updateNationalId = async (req, res) => {
       try {
             const { id } = req.params; // appointmentId
             const { nationalId } = req.body;
 
-            if (!nationalId) {
-                  return res.status(400).json({ message: "الرقم القومي مطلوب" });
+            if (!nationalId) return res.status(400).json({ message: "الرقم القومي مطلوب" });
+
+            // 1️⃣ جلب الحجز الحالي
+            const apptRes = await pool.query(`SELECT * FROM appointments WHERE id = $1`, [id]);
+            if (apptRes.rowCount === 0) return res.status(404).json({ message: "الحجز غير موجود" });
+
+            const appointment = apptRes.rows[0];
+
+            // 2️⃣ تحديث الرقم القومي في الحجوزات
+            await pool.query(`UPDATE appointments SET "nationalId" = $1 WHERE id = $2`, [nationalId, id]);
+
+            // 3️⃣ تحديث المدفوعات المرتبطة بالرقم الهاتفي القديم
+            if (appointment.phone) {
+                  await pool.query(
+                        `UPDATE payments SET "patientNationalId" = $1 WHERE "patientPhone" = $2`,
+                        [nationalId, appointment.phone]
+                  );
             }
 
-            const query = `
-            UPDATE appointments
-            SET "nationalId" = $1 
-            WHERE id = $2
-            RETURNING *;
-        `;
+            // 4️⃣ ممكن تضيف أي جداول تانية مربوطة بالرقم القومي هنا
 
-            const values = [nationalId, id];
-            const result = await pool.query(query, values);
-
-            if (result.rowCount === 0) {
-                  return res.status(404).json({ message: "الحجز غير موجود" });
-            }
-
-            res.json({ message: "success", data: result.rows[0] });
+            res.json({ message: "success", data: { ...appointment, nationalId } });
       } catch (error) {
             console.error("❌ Error in updateNationalId:", error);
             res.status(500).json({ message: "error", error: error.message });
