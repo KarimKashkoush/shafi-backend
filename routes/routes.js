@@ -14,7 +14,7 @@ const { addReceptionist, getReceptionists, updateReceptionistStatus, deleteRecep
 const { addPayment, getPaymentsByMedicalCenter } = require("../controllers/payments");
 
 const multer = require("multer");
-const { addAppointment, addResultToAppointment, getAppointmentsWithResults, deleteAppointment, updateNationalId, getAppointmentById, getAppointmentsForDashboard } = require("../controllers/addAppointment");
+const { addAppointment, addResultToAppointment, getAppointmentsWithResults, deleteAppointment, updateAppointment, getAppointmentById, getAppointmentsForDashboard } = require("../controllers/addAppointment");
 const { checkExistingResult } = require("../controllers/checkExistingResult");
 const { getAllResults } = require("../controllers/getResults");
 const { getResultsByNationalId } = require("../controllers/getResultsByNationalId");
@@ -51,7 +51,7 @@ router.post("/appointments", authenticateToken, requireRole('patient', 'doctor',
 router.get("/appointments", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), getAppointmentsWithResults);
 router.get("/getAppointmentsForDashboard/:id", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), getAppointmentsForDashboard);
 router.get("/appointment/:id", getAppointmentById);
-router.put("/appointments/:id/nationalId", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), updateNationalId);
+router.put("/appointments/:id", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), updateAppointment);
 router.delete("/appointments/:id", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), deleteAppointment);
 router.post("/appointments/:id/addResultAppointment", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), upload.array("files", 5), addResultToAppointment);
 

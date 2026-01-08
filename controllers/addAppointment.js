@@ -92,65 +92,64 @@ const s3 = new S3Client({
 });
 
 const addResultToAppointment = async (req, res) => {
-      try {
-            const { id } = req.params; // appointmentId
-            const { userId, report, nextAction, sessionCost, medicalCenterId } = req.body;
+  try {
+    const { id } = req.params; // appointmentId
+    const { userId, report, nextAction, sessionCost, medicalCenterId, medications, radiology, labTests } = req.body;
 
-            if (!userId) return res.status(400).json({ message: "userId (الدكتور) مطلوب" });
+    if (!userId) return res.status(400).json({ message: "userId (الدكتور) مطلوب" });
 
-            // هات بيانات الحجز
-            const apptRes = await pool.query(
-                  `SELECT "caseName", "phone", "nationalId", "testName"
-       FROM appointments WHERE id = $1`,
-                  [id]
-            );
+    const apptRes = await pool.query(
+      `SELECT "caseName", "phone", "nationalId", "testName" FROM appointments WHERE id = $1`,
+      [id]
+    );
+    if (apptRes.rowCount === 0) return res.status(404).json({ message: "الحجز مش موجود" });
 
-            if (apptRes.rowCount === 0) {
-                  return res.status(404).json({ message: "الحجز مش موجود" });
-            }
+    const { caseName, phone, nationalId, testName } = apptRes.rows[0];
 
-            const { caseName, phone, nationalId, testName } = apptRes.rows[0];
+    // رفع الملفات
+    let uploadedFiles = [];
+    if (req.files && req.files.length > 0) {
+      for (const file of req.files) {
+        const fileUrl = await uploadFileToS3(file);
+        uploadedFiles.push(fileUrl);
+      }
+    }
 
-            // رفع الملفات
-            let uploadedFiles = [];
-            if (req.files && req.files.length > 0) {
-                  for (const file of req.files) {
-                        const fileUrl = await uploadFileToS3(file);
-                        uploadedFiles.push(fileUrl);
-                  }
-            }
-
-            // إدخال النتيجة مرتبطة بالحجز
-            const query = `
-      INSERT INTO "patientsReports" ("appointmentId", "doctorId", "caseName", "phone", "nationalId", "testName", "files", "report", "nextAction", "sessionCost", "medicalCenterId")
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    const query = `
+      INSERT INTO "patientsReports"
+      ("appointmentId", "doctorId", "caseName", "phone", "nationalId", "testName", "files", "report", "nextAction", "sessionCost", "medicalCenterId", medications, radiology, "labTests")
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
       RETURNING *
     `;
 
-            const values = [
-                  id,
-                  userId,           // الدكتور
-                  caseName,
-                  phone,
-                  nationalId,       // المريض عن طريق الرقم القومي
-                  testName,
-                  JSON.stringify(uploadedFiles),
-                  report || null,
-                  nextAction || null,
-                  sessionCost || null,
-                  medicalCenterId || null  // هنا ضفنا medicalCenterId
-            ];
+    const values = [
+      id,
+      userId,
+      caseName,
+      phone,
+      nationalId,
+      testName,
+      JSON.stringify(uploadedFiles),
+      report || null,
+      nextAction || null,
+      sessionCost || null,
+      medicalCenterId || null,
+      JSON.stringify(medications || []),
+      JSON.stringify(radiology || []),
+      JSON.stringify(labTests || [])
+    ];
 
-            const resultInsert = await pool.query(query, values);
-            const newResult = resultInsert.rows[0];
+    const resultInsert = await pool.query(query, values);
+    const newResult = resultInsert.rows[0];
 
-            res.status(201).json({ message: "success", data: newResult });
+    res.status(201).json({ message: "success", data: newResult });
 
-      } catch (error) {
-            console.error("❌ Error in addResultToAppointment:", error);
-            res.status(500).json({ message: "error", error: error.message });
-      }
+  } catch (error) {
+    console.error("❌ Error in addResultToAppointment:", error);
+    res.status(500).json({ message: "error", error: error.message });
+  }
 };
+
 
 const getAppointmentsWithResults = async (req, res) => {
       try {
@@ -288,38 +287,39 @@ const deleteAppointment = async (req, res) => {
             res.status(500).json({ message: "error", error: error.message });
       }
 };
-const updateNationalId = async (req, res) => {
+// controllers/appointments.js
+const updateAppointment = async (req, res) => {
       try {
-            const { id } = req.params; // appointmentId
-            const { nationalId } = req.body;
-
-            if (!nationalId) return res.status(400).json({ message: "الرقم القومي مطلوب" });
+            const { id } = req.params;
+            const updatedData = req.body; // كل البيانات اللي عايز تحدثها
 
             // 1️⃣ جلب الحجز الحالي
             const apptRes = await pool.query(`SELECT * FROM appointments WHERE id = $1`, [id]);
-            if (apptRes.rowCount === 0) return res.status(404).json({ message: "الحجز غير موجود" });
+            if (apptRes.rowCount === 0)
+                  return res.status(404).json({ message: "الحجز غير موجود" });
 
             const appointment = apptRes.rows[0];
 
-            // 2️⃣ تحديث الرقم القومي في الحجوزات
-            await pool.query(`UPDATE appointments SET "nationalId" = $1 WHERE id = $2`, [nationalId, id]);
+            // 2️⃣ تحديث كل البيانات
+            const fields = Object.keys(updatedData);
+            const values = Object.values(updatedData);
 
-            // 3️⃣ تحديث المدفوعات المرتبطة بالرقم الهاتفي القديم
-            if (appointment.phone) {
-                  await pool.query(
-                        `UPDATE payments SET "patientNationalId" = $1 WHERE "patientPhone" = $2`,
-                        [nationalId, appointment.phone]
-                  );
-            }
+            const setString = fields.map((f, idx) => `"${f}" = $${idx + 1}`).join(", ");
 
-            // 4️⃣ ممكن تضيف أي جداول تانية مربوطة بالرقم القومي هنا
+            await pool.query(
+                  `UPDATE appointments SET ${setString} WHERE id = $${fields.length + 1}`,
+                  [...values, id]
+            );
 
-            res.json({ message: "success", data: { ...appointment, nationalId } });
+            res.json({ message: "success", data: { ...appointment, ...updatedData } });
       } catch (error) {
-            console.error("❌ Error in updateNationalId:", error);
+            console.error("❌ Error in updateAppointment:", error);
             res.status(500).json({ message: "error", error: error.message });
       }
 };
+
+module.exports = { updateAppointment };
+
 
 const getAppointmentById = async (req, res) => {
       try {
@@ -366,7 +366,7 @@ module.exports = {
       addResultToAppointment,
       getAppointmentsWithResults,
       deleteAppointment,
-      updateNationalId,
+      updateAppointment,
       getAppointmentById,
       getAppointmentsForDashboard
 };
