@@ -92,63 +92,102 @@ const s3 = new S3Client({
 });
 
 const addResultToAppointment = async (req, res) => {
-  try {
-    const { id } = req.params; // appointmentId
-    const { userId, report, nextAction, sessionCost, medicalCenterId, medications, radiology, labTests } = req.body;
+      try {
+            const { id } = req.params;
+            let {
+                  userId,
+                  report,
+                  nextAction,
+                  sessionCost,
+                  medicalCenterId,
+                  medications,
+                  radiology,
+                  labTests
+            } = req.body;
 
-    if (!userId) return res.status(400).json({ message: "userId (الدكتور) مطلوب" });
+            if (!userId) {
+                  return res.status(400).json({ message: "userId (الدكتور) مطلوب" });
+            }
 
-    const apptRes = await pool.query(
-      `SELECT "caseName", "phone", "nationalId", "testName" FROM appointments WHERE id = $1`,
-      [id]
-    );
-    if (apptRes.rowCount === 0) return res.status(404).json({ message: "الحجز مش موجود" });
+            // ✅ parse JSON strings
+            medications = medications ? JSON.parse(medications) : [];
+            radiology = radiology ? JSON.parse(radiology) : [];
+            labTests = labTests ? JSON.parse(labTests) : [];
 
-    const { caseName, phone, nationalId, testName } = apptRes.rows[0];
+            const apptRes = await pool.query(
+                  `SELECT "caseName", "phone", "nationalId", "testName"
+                  FROM appointments WHERE id = $1`,
+                  [id]
+            );
 
-    // رفع الملفات
-    let uploadedFiles = [];
-    if (req.files && req.files.length > 0) {
-      for (const file of req.files) {
-        const fileUrl = await uploadFileToS3(file);
-        uploadedFiles.push(fileUrl);
-      }
-    }
+            if (apptRes.rowCount === 0) {
+                  return res.status(404).json({ message: "الحجز مش موجود" });
+            }
 
-    const query = `
+            const { caseName, phone, nationalId, testName } = apptRes.rows[0];
+
+            // رفع الملفات
+            let uploadedFiles = [];
+            if (req.files?.length) {
+                  uploadedFiles = await Promise.all(req.files.map(async (file) => {
+                        const fileUrl = await uploadFileToS3(file);
+                        return fileUrl;
+                  }));
+            }
+
+
+            const query = `
       INSERT INTO "patientsReports"
-      ("appointmentId", "doctorId", "caseName", "phone", "nationalId", "testName", "files", "report", "nextAction", "sessionCost", "medicalCenterId", medications, radiology, "labTests")
+      (
+        "appointmentId",
+        "doctorId",
+        "caseName",
+        "phone",
+        "nationalId",
+        "testName",
+        "files",
+        "report",
+        "nextAction",
+        "sessionCost",
+        "medicalCenterId",
+        "medications",
+        "radiology",
+        "labTests"
+      )
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
       RETURNING *
     `;
 
-    const values = [
-      id,
-      userId,
-      caseName,
-      phone,
-      nationalId,
-      testName,
-      JSON.stringify(uploadedFiles),
-      report || null,
-      nextAction || null,
-      sessionCost || null,
-      medicalCenterId || null,
-      JSON.stringify(medications || []),
-      JSON.stringify(radiology || []),
-      JSON.stringify(labTests || [])
-    ];
+            const values = [
+                  id,
+                  userId,
+                  caseName,
+                  phone,
+                  nationalId,
+                  testName,
+                  JSON.stringify(uploadedFiles),
+                  report || null,
+                  nextAction || null,
+                  sessionCost || null,
+                  medicalCenterId || null,
+                  JSON.stringify(medications),
+                  JSON.stringify(radiology),
+                  JSON.stringify(labTests)
+            ];
 
-    const resultInsert = await pool.query(query, values);
-    const newResult = resultInsert.rows[0];
+            const resultInsert = await pool.query(query, values);
 
-    res.status(201).json({ message: "success", data: newResult });
+            res.status(201).json({
+                  message: "success",
+                  data: resultInsert.rows[0]
+            });
 
-  } catch (error) {
-    console.error("❌ Error in addResultToAppointment:", error);
-    res.status(500).json({ message: "error", error: error.message });
-  }
+      } catch (error) {
+            console.error("❌ Error in addResultToAppointment:", error);
+            res.status(500).json({ message: "error", error: error.message });
+      }
 };
+
 
 
 const getAppointmentsWithResults = async (req, res) => {

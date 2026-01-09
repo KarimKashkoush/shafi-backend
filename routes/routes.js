@@ -25,15 +25,37 @@ const { getPatientReports } = require("../controllers/doctorPatientReports");
 const storage = multer.memoryStorage();
 const upload = multer({
       storage,
-      limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+      limits: {
+            fileSize: 100 * 1024 * 1024 // ✅ 100MB (غيّرها حسب احتياجك)
+      },
       fileFilter: (req, file, cb) => {
-            if (file.mimetype.startsWith("image/") || file.mimetype === "application/pdf") {
-                  cb(null, true);
-            } else {
-                  cb(new Error("نوع الملف غير مسموح. ارفع صور أو PDF فقط."), false);
+            // صور
+            if (file.mimetype.startsWith("image/")) {
+                  return cb(null, true);
             }
+
+            // PDF
+            if (file.mimetype === "application/pdf") {
+                  return cb(null, true);
+            }
+
+            // ✅ فيديوهات
+            if (
+                  file.mimetype === "video/mp4" ||
+                  file.mimetype === "video/webm" ||
+                  file.mimetype === "video/ogg"
+            ) {
+                  return cb(null, true);
+            }
+
+            // ❌ أي حاجة غير كده
+            cb(
+                  new Error("نوع الملف غير مسموح. ارفع صور أو PDF أو فيديو فقط."),
+                  false
+            );
       },
 });
+
 
 /* ====================== Routes ====================== */
 // ✅ Auth
