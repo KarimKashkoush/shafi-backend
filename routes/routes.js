@@ -1,7 +1,6 @@
 const express = require("express");
 const router = express.Router();
 
-
 const { registerUser, getUser, getAllUsers, updateUser, changePassword } = require("../controllers/authController");
 const { login } = require("../controllers/login");
 const { addReport } = require("../controllers/addReport");
@@ -14,7 +13,7 @@ const { addReceptionist, getReceptionists, updateReceptionistStatus, deleteRecep
 const { addPayment, getPaymentsByMedicalCenter } = require("../controllers/payments");
 
 const multer = require("multer");
-const { addAppointment, addResultToAppointment, getAppointmentsWithResults, deleteAppointment, updateAppointment, getAppointmentById, getAppointmentsForDashboard } = require("../controllers/addAppointment");
+const { addAppointment, addResultToAppointment, getAppointmentsWithResults, deleteAppointment, updateAppointment, getAppointmentById, getAppointmentsForDashboard, updateResultAppointment, getAppointmentsUser } = require("../controllers/addAppointment");
 const { checkExistingResult } = require("../controllers/checkExistingResult");
 const { getAllResults } = require("../controllers/getResults");
 const { getResultsByNationalId } = require("../controllers/getResultsByNationalId");
@@ -48,7 +47,6 @@ const upload = multer({
                   return cb(null, true);
             }
 
-            // ❌ أي حاجة غير كده
             cb(
                   new Error("نوع الملف غير مسموح. ارفع صور أو PDF أو فيديو فقط."),
                   false
@@ -76,6 +74,8 @@ router.get("/appointment/:id", getAppointmentById);
 router.put("/appointments/:id", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), updateAppointment);
 router.delete("/appointments/:id", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), deleteAppointment);
 router.post("/appointments/:id/addResultAppointment", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), upload.array("files", 5), addResultToAppointment);
+router.put("/appointments/:id/updateResultAppointment/:reportId", authenticateToken, requireRole('medicalCenter'), upload.array("files", 5), updateResultAppointment);
+router.get("/appointments/user", authenticateToken, requireRole('medicalCenter'), getAppointmentsUser);
 
 // ✅ Reports & Results
 router.post("/addReport", authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology'), addReport);
@@ -100,7 +100,6 @@ router.get("/getAllStafByAdmin", authenticateToken, requireRole('admin'), getAll
 router.put("/toggleUserStatus/:id", authenticateToken, requireRole('admin'), toggleUserStatus);
 router.post("/getUserById", authenticateToken, requireRole('admin'), getUserById);
 
-
 // Payments
 router.post("/addPayment", authenticateToken, addPayment);
 // فرضًا عندك authenticateToken و requireRole جاهزين
@@ -110,9 +109,6 @@ router.get(
       requireRole("doctor", "admin", "medicalCenter"),
       getPaymentsByMedicalCenter
 );
-
-
-
 
 router.get("/doctor/patientFiles/:identifier", getPatientReports);
 
