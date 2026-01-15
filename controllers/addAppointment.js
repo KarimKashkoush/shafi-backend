@@ -1,6 +1,7 @@
 const pool = require('../db');
-const { uploadFileToS3 } = require("../middleware/s3");
+const { uploadFileToS3, deleteFromS3 } = require("../middleware/s3");
 const { toUtcIso } = require("../utils/datetime");
+
 const safeParseJson = (val, fallback) => {
       if (val === undefined || val === null || val === "") return fallback;
 
@@ -169,15 +170,6 @@ const getAppointmentsUser = async (req, res) => {
       }
 };
 
-const { S3Client, DeleteObjectCommand } = require("@aws-sdk/client-s3");
-
-const s3 = new S3Client({
-      region: process.env.AWS_REGION,
-      credentials: {
-            accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-      },
-});
 
 const addResultToAppointment = async (req, res) => {
       try {
@@ -221,8 +213,10 @@ const addResultToAppointment = async (req, res) => {
             // رفع الملفات
             let uploadedFiles = [];
             if (req.files?.length) {
-                  uploadedFiles = await Promise.all(req.files.map(file => uploadFileToS3(file)));
+                  const uploaded = await Promise.all(req.files.map(file => uploadFileToS3(file)));
+                  uploadedFiles = uploaded.map(x => x.url); // ✅ بدون const
             }
+
 
             // ✅ لو العمود files jsonb برضه: خزّن array
             // uploadedFiles غالبًا array of urls
@@ -295,7 +289,8 @@ const updateResultAppointment = async (req, res) => {
             // الملفات الجديدة
             let newFiles = [];
             if (req.files?.length) {
-                  newFiles = await Promise.all(req.files.map(file => uploadFileToS3(file)));
+                  const uploaded = await Promise.all(req.files.map(file => uploadFileToS3(file)));
+                  newFiles = uploaded.map(x => x.url);
             }
 
             // هات الملفات القديمة (jsonb array)
@@ -454,12 +449,8 @@ const deleteAppointment = async (req, res) => {
                         }
 
                         for (const fileUrl of filesArray) {
-                              const key = fileUrl.split("amazonaws.com/")[1]; // بس اسم الملف بعد الباكت
                               try {
-                                    await s3.send(new DeleteObjectCommand({
-                                          Bucket: process.env.AWS_BUCKET_NAME,
-                                          Key: key,
-                                    }));
+                                    await deleteFromS3(fileUrl);
                                     console.log(`✅ Deleted file from S3: ${fileUrl}`);
                               } catch (err) {
                                     console.error(`❌ Failed to delete file ${fileUrl}:`, err);
@@ -520,9 +511,6 @@ const updateAppointment = async (req, res) => {
             res.status(500).json({ message: "error", error: error.message });
       }
 };
-
-module.exports = { updateAppointment };
-
 
 const getAppointmentById = async (req, res) => {
       try {
