@@ -75,7 +75,6 @@ router.put("/appointments/:id", authenticateToken, requireRole('patient', 'docto
 router.delete("/appointments/:id", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), deleteAppointment);
 router.post("/appointments/:id/addResultAppointment", authenticateToken, requireRole('patient', 'doctor', 'pharmacist', 'lab', 'radiology', 'receptionist', 'medicalCenter'), upload.array("files", 5), addResultToAppointment);
 router.put("/appointments/:id/updateResultAppointment/:reportId", authenticateToken, requireRole('medicalCenter'), upload.array("files", 5), updateResultAppointment);
-router.get("/appointments/user", authenticateToken, requireRole('medicalCenter'), getAppointmentsUser);
 
 // ✅ Reports & Results
 router.post("/addReport", authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology'), addReport);

@@ -26,7 +26,6 @@ const safeParseArray = (val) => {
       return Array.isArray(parsed) ? parsed : [];
 };
 
-// ✅ لو احتجت object (مش مستخدم هنا بس مفيد)
 const safeParseObject = (val) => {
       const parsed = safeParseJson(val, {});
       return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
@@ -34,7 +33,9 @@ const safeParseObject = (val) => {
 
 const addAppointment = async (req, res) => {
       try {
+            // ✅ عندك userId = medicalCenterId (قاصدها)
             const userId = req.body.userId || null;
+
             const caseName = req.body.caseName || null;
             const phone = req.body.phone || null;
             const nationalId = req.body.nationalId || null;
@@ -60,49 +61,56 @@ const addAppointment = async (req, res) => {
                   return res.status(400).json({ message: "تاريخ الميلاد غير صالح" });
             }
 
-            // جلب medicalCenterId مباشرة من جدول users
-            let medicalCenterId = null;
-            if (userId) {
-                  const userQuery = await pool.query(
-                        'SELECT "medicalCenterId" FROM users WHERE id = $1',
-                        [userId]
-                  );
-                  if (userQuery.rows.length > 0) {
-                        medicalCenterId = userQuery.rows[0].medicalCenterId;
-                  }
-            }
+            // ✅ بما إنك قاصد userId = medicalCenterId
+            const medicalCenterId = userId || null;
 
-            // التعامل مع fileNumber
+            // =========================
+            // ✅ التعامل مع fileNumber (حسب الاسم + رقم الهاتف)
+            // =========================
             let fileNumber = null;
 
-            if (caseName) {
-                  // نبحث لو فيه أي حجز بنفس الاسم
+            const cleanName = String(caseName ?? "").trim();
+            const cleanPhone = String(phone ?? "").replace(/\s+/g, "").trim(); // يمنع null.replace + يشيل مسافات
+
+            if (cleanName && cleanPhone) {
+                  // ✅ مقارنة قوية: trim + lower للاسم، وشيل مسافات من phone المخزن في DB
                   const existingQuery = await pool.query(
-                        `SELECT "fileNumber" FROM appointments 
-     WHERE "caseName" = $1 LIMIT 1`,
-                        [caseName]
+                        `
+        SELECT "fileNumber"
+        FROM appointments
+        WHERE "medicalCenterId" = $1
+          AND lower(trim("caseName")) = lower(trim($2))
+          AND regexp_replace(coalesce("phone", ''), '\\s+', '', 'g') = $3
+        ORDER BY "createdAt" ASC
+        LIMIT 1
+        `,
+                        [medicalCenterId, cleanName, cleanPhone]
                   );
 
-                  if (existingQuery.rows.length > 0) {
-                        // الاسم موجود → استخدم نفس الرقم
+                  if (existingQuery.rows.length > 0 && existingQuery.rows[0].fileNumber) {
+                        // نفس الاسم + نفس التليفون => نفس رقم الملف
                         fileNumber = existingQuery.rows[0].fileNumber;
                   } else {
-                        // الاسم جديد → رقم جديد
+                        // تركيبة جديدة => رقم ملف جديد
                         const seqResult = await pool.query(`SELECT nextval('file_number_seq')`);
                         fileNumber = seqResult.rows[0].nextval;
                   }
+
             } else {
-                  // لو الاسم مش موجود، نولّد رقم جديد
+                  // لو ناقص اسم أو تليفون => رقم جديد
                   const seqResult = await pool.query(`SELECT nextval('file_number_seq')`);
                   fileNumber = seqResult.rows[0].nextval;
             }
 
-            // لو مفيش ملف موجود، نولّد رقم جديد
+            // تأكيد احتياطي
             if (!fileNumber) {
                   const seqResult = await pool.query(`SELECT nextval('file_number_seq')`);
                   fileNumber = seqResult.rows[0].nextval;
             }
 
+            // =========================
+            // INSERT
+            // =========================
             const query = `
       INSERT INTO appointments 
       ("userId", "caseName", "phone", "nationalId", "testName", "doctorId",
@@ -114,8 +122,8 @@ const addAppointment = async (req, res) => {
 
             const values = [
                   userId,
-                  caseName,
-                  phone,
+                  cleanName || null,
+                  cleanPhone || null,
                   nationalId,
                   testName,
                   doctorId,
@@ -131,42 +139,10 @@ const addAppointment = async (req, res) => {
 
             const result = await pool.query(query, values);
 
-            res.json({ message: "success", data: result.rows[0] });
+            return res.json({ message: "success", data: result.rows[0] });
       } catch (error) {
             console.error("❌ Error in addAppointment:", error);
-            res.status(500).json({ message: "error", error: error.message });
-      }
-};
-
-const getAppointmentsUser = async (req, res) => {
-      try {
-            // تأكد إن المستخدم مسجل
-            if (!req.user?.id) {
-                  return res.status(401).json({ message: "المستخدم غير موجود" });
-            }
-
-            // جلب medicalCenterId للمستخدم
-            const userQuery = await pool.query(
-                  `SELECT "medicalCenterId" FROM users WHERE id = $1`,
-                  [req.user.id]
-            );
-
-            if (userQuery.rows.length === 0) {
-                  return res.status(404).json({ message: "المستخدم غير موجود" });
-            }
-
-            const medicalCenterId = userQuery.rows[0].medicalCenterId;
-
-            // جلب كل المواعيد الخاصة بهذا المركز
-            const appointmentsQuery = await pool.query(
-                  `SELECT * FROM appointments WHERE "medicalCenterId" = $1 ORDER BY "dateTime" DESC`,
-                  [medicalCenterId]
-            );
-
-            res.json({ message: "success", data: appointmentsQuery.rows });
-      } catch (error) {
-            console.error(error);
-            res.status(500).json({ message: "error", error: error.message });
+            return res.status(500).json({ message: "error", error: error.message });
       }
 };
 
@@ -348,7 +324,6 @@ const updateResultAppointment = async (req, res) => {
       }
 };
 
-
 const getAppointmentsWithResults = async (req, res) => {
       try {
             const query = `
@@ -366,6 +341,7 @@ const getAppointmentsWithResults = async (req, res) => {
             a."chronicDiseaseDetails",
             a.price,
             a."isRevisit",
+            a."fileNumber",
 
             r.files AS "resultFiles",
             r."createdAt" AS "resultCreatedAt",
@@ -561,5 +537,4 @@ module.exports = {
       getAppointmentById,
       getAppointmentsForDashboard,
       updateResultAppointment,
-      getAppointmentsUser
 };
