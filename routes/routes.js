@@ -116,7 +116,6 @@ router.get("/doctor/patientFiles/:identifier", getPatientReports);
 // Doctors
 router.get("/doctors", authenticateToken, requireRole('doctor', 'pharmacist', 'lab', 'radiology', 'radiology_reception'), getAllDoctors);
 
-
 const { getS3Usage } = require("../controllers/s3Size");
 const { getRDSUsage } = require("../controllers/databaseSize");
 router.get("/s3-usage", getS3Usage);
