@@ -8,13 +8,13 @@ async function addPayment(req, res) {
       patientNationalId,
       patientPhone,
       doctorId,
-      sessionId,        // ده id بتاع patientsReports
+      sessionId,        // ممكن يبقى null
       appointmentId,
       amount,
       paymentMethod,
       notes,
       medicalCenterId,
-      sessionCost       // ✅ جديد: قيمه الجلسة لو مش متسجله
+      sessionCost
     } = req.body;
 
     if (!doctorId || !amount || !medicalCenterId || !appointmentId) {
@@ -23,17 +23,37 @@ async function addPayment(req, res) {
       });
     }
 
-    await client.query("BEGIN");
-
-    // ✅ لازم يبقى عندك sessionId عشان sessionCost في patientsReports
-    if (!sessionId) {
-      await client.query("ROLLBACK");
-      return res.status(400).json({
-        error: "sessionId (patientsReports.id) required to attach payment",
-      });
+    const incomingAmount = Number(amount || 0);
+    if (incomingAmount <= 0) {
+      return res.status(400).json({ error: "amount must be > 0" });
     }
 
-    // 1) هات sessionCost الحالي من patientsReports
+    await client.query("BEGIN");
+
+    // ✅ 1) لو مفيش sessionId => دفع قبل التقرير (يتسجل على الحجز بس)
+    if (!sessionId) {
+      const result = await client.query(
+        `INSERT INTO payments
+         ("patientNationalId","patientPhone","doctorId","sessionId","appointmentId","amount","paymentMethod","notes","medicalCenterId")
+         VALUES ($1,$2,$3,NULL,$4,$5,$6,$7,$8)
+         RETURNING *`,
+        [
+          patientNationalId || null,
+          patientPhone || null,
+          doctorId,
+          appointmentId,
+          incomingAmount,
+          paymentMethod || null,
+          notes || null,
+          medicalCenterId
+        ]
+      );
+
+      await client.query("COMMIT");
+      return res.status(201).json({ success: true, payment: result.rows[0] });
+    }
+
+    // ✅ 2) لو sessionId موجود => نفس منطقك الحالي (checks + update cost)
     const reportRow = await client.query(
       `
       SELECT id, "sessionCost"
@@ -54,20 +74,15 @@ async function addPayment(req, res) {
     const currentCost = Number(reportRow.rows[0].sessionCost || 0);
     const incomingCost = Number(sessionCost || 0);
 
-    // 2) لو cost مش متحدد (0/null) والمستخدم بعت cost => حدّثه
     if (currentCost <= 0 && incomingCost > 0) {
       await client.query(
-        `
-        UPDATE "patientsReports"
-        SET "sessionCost" = $1
-        WHERE id = $2
-        `,
+        `UPDATE "patientsReports" SET "sessionCost" = $1 WHERE id = $2`,
         [incomingCost, sessionId]
       );
     }
 
-    // 3) احسب max لو فيه cost فعلي عشان تمنع دفع زيادة
     const finalCost = currentCost > 0 ? currentCost : incomingCost;
+
     if (finalCost > 0) {
       const paidAgg = await client.query(
         `SELECT COALESCE(SUM(amount),0) AS paid
@@ -77,12 +92,6 @@ async function addPayment(req, res) {
       );
 
       const alreadyPaid = Number(paidAgg.rows[0].paid || 0);
-      const incomingAmount = Number(amount || 0);
-
-      if (incomingAmount <= 0) {
-        await client.query("ROLLBACK");
-        return res.status(400).json({ error: "amount must be > 0" });
-      }
 
       if (alreadyPaid + incomingAmount > finalCost) {
         await client.query("ROLLBACK");
@@ -92,19 +101,18 @@ async function addPayment(req, res) {
       }
     }
 
-    // 4) Insert payment
     const result = await client.query(
       `INSERT INTO payments
-      ("patientNationalId", "patientPhone", "doctorId", "sessionId", "appointmentId", "amount", "paymentMethod", "notes", "medicalCenterId")
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-      RETURNING *`,
+       ("patientNationalId","patientPhone","doctorId","sessionId","appointmentId","amount","paymentMethod","notes","medicalCenterId")
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       RETURNING *`,
       [
         patientNationalId || null,
         patientPhone || null,
         doctorId,
         sessionId,
         appointmentId,
-        Number(amount),
+        incomingAmount,
         paymentMethod || null,
         notes || null,
         medicalCenterId
@@ -112,7 +120,7 @@ async function addPayment(req, res) {
     );
 
     await client.query("COMMIT");
-    res.status(201).json({ success: true, payment: result.rows[0] });
+    return res.status(201).json({ success: true, payment: result.rows[0] });
 
   } catch (error) {
     try { await client.query("ROLLBACK"); } catch {}
@@ -122,6 +130,7 @@ async function addPayment(req, res) {
     client.release();
   }
 }
+
 
 
 

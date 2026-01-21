@@ -1,3 +1,4 @@
+// controllers/appointments.js
 const pool = require('../db');
 const { uploadFileToS3, deleteFromS3 } = require("../middleware/s3");
 const { toUtcIso } = require("../utils/datetime");
@@ -5,15 +6,12 @@ const { toUtcIso } = require("../utils/datetime");
 const safeParseJson = (val, fallback) => {
       if (val === undefined || val === null || val === "") return fallback;
 
-      // لو جاي أصلا object/array (مثلا لو endpoint مش multipart)
       if (typeof val === "object") return val;
 
-      // لو جاي string من multipart
       if (typeof val === "string") {
             try {
                   return JSON.parse(val);
             } catch (e) {
-                  // لو جالك نص عادي مش JSON
                   return fallback;
             }
       }
@@ -57,21 +55,16 @@ const addAppointment = async (req, res) => {
                   ? String(referredFromDoctorRaw).trim()
                   : null;
 
-            // Normalize name/phone (زي ما كنت عامل)
+            // Normalize name/phone
             const cleanName = String(caseName ?? "").trim();
             const cleanPhone = String(phone ?? "").replace(/\s+/g, "").trim();
 
-            // ✅ لو محوّلة لازم اسم الدكتور
             if (isReferred && !referredFromDoctor) {
-                  return res
-                        .status(400)
-                        .json({ message: "اكتب اسم الدكتور اللي محوّل الحالة" });
+                  return res.status(400).json({ message: "اكتب اسم الدكتور اللي محوّل الحالة" });
             }
 
             const normalizedDateTime = dateTime ? toUtcIso(dateTime) : null;
-            const normalizedBirthDate = birthDate
-                  ? toUtcIso(birthDate, { dateOnly: true })
-                  : null;
+            const normalizedBirthDate = birthDate ? toUtcIso(birthDate, { dateOnly: true }) : null;
 
             if (dateTime && !normalizedDateTime) {
                   return res.status(400).json({ message: "تاريخ / وقت الحجز غير صالح" });
@@ -85,7 +78,7 @@ const addAppointment = async (req, res) => {
             const medicalCenterId = userId || null;
 
             // =========================
-            // ✅ التعامل مع fileNumber (حسب الاسم + رقم الهاتف)
+            // ✅ التعامل مع fileNumber
             // =========================
             let fileNumber = null;
 
@@ -114,7 +107,6 @@ const addAppointment = async (req, res) => {
                   fileNumber = seqResult.rows[0].nextval;
             }
 
-            // تأكيد احتياطي
             if (!fileNumber) {
                   const seqResult = await pool.query(`SELECT nextval('file_number_seq')`);
                   fileNumber = seqResult.rows[0].nextval;
@@ -174,27 +166,28 @@ const addResultToAppointment = async (req, res) => {
                   medications,
                   radiology,
                   labTests,
-                  notes, // ✅ جديد
+                  notes,
             } = req.body;
 
             if (!userId) {
                   return res.status(400).json({ message: "userId (الدكتور) مطلوب" });
             }
 
-            // ✅ Parse (jsonb columns => نخزن arrays/objects زي ما هي)
             report = safeParseArray(report);
             nextAction = safeParseArray(nextAction);
             medications = safeParseArray(medications);
             radiology = safeParseArray(radiology);
             labTests = safeParseArray(labTests);
 
-            // ✅ notes نص عادي
             const cleanNotes = notes ? String(notes).trim() : null;
 
-            // هات بيانات الحجز
+            // هات بيانات الحجز + medicalCenterId الحقيقي للحجز (مهم للربط)
             const apptRes = await pool.query(
-                  `SELECT "caseName", "phone", "nationalId", "testName"
-       FROM appointments WHERE id = $1`,
+                  `
+      SELECT "caseName", "phone", "nationalId", "testName", "medicalCenterId"
+      FROM appointments
+      WHERE id = $1
+      `,
                   [id]
             );
 
@@ -202,7 +195,16 @@ const addResultToAppointment = async (req, res) => {
                   return res.status(404).json({ message: "الحجز مش موجود" });
             }
 
-            const { caseName, phone, nationalId, testName } = apptRes.rows[0];
+            const {
+                  caseName,
+                  phone,
+                  nationalId,
+                  testName,
+                  medicalCenterId: apptMedicalCenterId
+            } = apptRes.rows[0];
+
+            // لو request مبعوت فيه medicalCenterId سيبه، وإلا خده من الحجز
+            const finalMedicalCenterId = medicalCenterId || apptMedicalCenterId || null;
 
             // رفع الملفات
             let uploadedFiles = [];
@@ -239,14 +241,28 @@ const addResultToAppointment = async (req, res) => {
                   JSON.stringify(report),
                   JSON.stringify(nextAction),
                   Number(sessionCost) || 0,
-                  medicalCenterId || null,
+                  finalMedicalCenterId,
                   JSON.stringify(medications),
                   JSON.stringify(radiology),
                   JSON.stringify(labTests),
-                  cleanNotes, // ✅
+                  cleanNotes,
             ];
 
             const result = await pool.query(query, values);
+
+            // ✅✅ الجديد: اربط أي مدفوعات قديمة (قبل التقرير) بالتقرير الجديد
+            const newReportId = result.rows[0].id;
+
+            await pool.query(
+                  `
+      UPDATE payments
+      SET "sessionId" = $1
+      WHERE "appointmentId" = $2
+        AND "medicalCenterId" = $3
+        AND "sessionId" IS NULL
+      `,
+                  [newReportId, id, finalMedicalCenterId]
+            );
 
             res.status(201).json({
                   message: "success",
@@ -269,17 +285,15 @@ const updateResultAppointment = async (req, res) => {
                   medications,
                   radiology,
                   labTests,
-                  notes, // ✅ جديد
+                  notes,
             } = req.body;
 
-            // ✅ Parse
             report = safeParseArray(report);
             nextAction = safeParseArray(nextAction);
             medications = safeParseArray(medications);
             radiology = safeParseArray(radiology);
             labTests = safeParseArray(labTests);
 
-            // ✅ notes نص عادي
             const cleanNotes = notes ? String(notes).trim() : null;
 
             // الملفات الجديدة
@@ -289,7 +303,7 @@ const updateResultAppointment = async (req, res) => {
                   newFiles = uploaded.map((x) => x.url);
             }
 
-            // هات الملفات القديمة (jsonb array)
+            // هات الملفات القديمة
             const oldRes = await pool.query(
                   `SELECT "files" FROM "patientsReports" WHERE id = $1`,
                   [reportId]
@@ -326,7 +340,7 @@ const updateResultAppointment = async (req, res) => {
                   JSON.stringify(medications),
                   JSON.stringify(radiology),
                   JSON.stringify(labTests),
-                  cleanNotes,  // ✅
+                  cleanNotes,
                   reportId,
                   id,
             ];
@@ -342,7 +356,6 @@ const updateResultAppointment = async (req, res) => {
             res.status(500).json({ message: "error", error: error.message });
       }
 };
-
 
 const getAppointmentsWithResults = async (req, res) => {
       try {
@@ -368,7 +381,6 @@ const getAppointmentsWithResults = async (req, res) => {
             r."sessionCost" AS "sessionCost",
             r."report" AS "resultReports",
 
-
             d.id AS "doctorId",
             u.id AS "doctorUserId"
       FROM appointments a
@@ -388,20 +400,20 @@ const getAppointmentsWithResults = async (req, res) => {
 
 const getAppointmentsForDashboard = async (req, res) => {
       try {
-            const { id } = req.params; // ده هيبقى userId
+            const { id } = req.params;
 
             const query = `
-SELECT 
-      a.id,
-      a."caseName",
-      a."dateTime",
-      a.price,
-      a."isRevisit",
-      r."sessionCost",
-      r."doctorId",
-      u."fullName" AS "doctorName",
-      r."report" AS "report",
-      r."createdAt" AS "createdAt"
+      SELECT 
+        a.id,
+        a."caseName",
+        a."dateTime",
+        a.price,
+        a."isRevisit",
+        r."sessionCost",
+        r."doctorId",
+        u."fullName" AS "doctorName",
+        r."report" AS "report",
+        r."createdAt" AS "createdAt"
       FROM appointments a
       LEFT JOIN "patientsReports" r ON a.id = r."appointmentId"
       LEFT JOIN users u ON r."doctorId" = u.id
@@ -417,7 +429,6 @@ SELECT
       }
 };
 
-// ✅ 4. حذف حجز بالـ id
 const deleteAppointment = async (req, res) => {
       try {
             const { id } = req.params;
@@ -431,16 +442,14 @@ const deleteAppointment = async (req, res) => {
             // 2️⃣ حذف كل ملف من S3
             for (const report of reports) {
                   if (report.files) {
-                        // لو files عبارة عن array بالفعل
                         let filesArray = [];
                         if (Array.isArray(report.files)) {
                               filesArray = report.files;
                         } else if (typeof report.files === "string") {
-                              // لو string، حاول تقسيمه على , أو خليه array من عنصر واحد
                               try {
                                     filesArray = JSON.parse(report.files);
                               } catch {
-                                    filesArray = [report.files]; // بس خليها array من عنصر واحد
+                                    filesArray = [report.files];
                               }
                         }
 
@@ -455,16 +464,16 @@ const deleteAppointment = async (req, res) => {
                   }
             }
 
-
             // 3️⃣ حذف السجلات من DB
             await pool.query(`DELETE FROM "patientsReports" WHERE "appointmentId" = $1`, [id]);
             await pool.query(`DELETE FROM payments WHERE "appointmentId" = $1`, [id]);
+
             const { rows: deletedAppointments, rowCount } = await pool.query(
                   `DELETE FROM appointments WHERE id = $1 RETURNING *`,
                   [id]
             );
 
-            if (rowCount === 0) {
+            if (!rowCount) {
                   return res.status(404).json({ message: "الحجز غير موجود" });
             }
 
@@ -477,34 +486,104 @@ const deleteAppointment = async (req, res) => {
             res.status(500).json({ message: "error", error: error.message });
       }
 };
-// controllers/appointments.js
+
 const updateAppointment = async (req, res) => {
       try {
             const { id } = req.params;
-            const updatedData = req.body; // كل البيانات اللي عايز تحدثها
+            const updatedData = req.body || {};
 
-            // 1️⃣ جلب الحجز الحالي
             const apptRes = await pool.query(`SELECT * FROM appointments WHERE id = $1`, [id]);
-            if (apptRes.rowCount === 0)
+            if (!apptRes.rowCount) {
                   return res.status(404).json({ message: "الحجز غير موجود" });
+            }
 
             const appointment = apptRes.rows[0];
+            const fileNumber = appointment.fileNumber;
+            const medicalCenterId = appointment.medicalCenterId;
 
-            // 2️⃣ تحديث كل البيانات
-            const fields = Object.keys(updatedData);
-            const values = Object.values(updatedData);
+            if (!fileNumber || !medicalCenterId) {
+                  return res.status(400).json({ message: "رقم الملف أو المركز غير موجودين للحجز" });
+            }
 
-            const setString = fields.map((f, idx) => `"${f}" = $${idx + 1}`).join(", ");
+            const PATIENT_FIELDS = new Set([
+                  "caseName",
+                  "phone",
+                  "nationalId",
+                  "birthDate",
+                  "hasChronicDisease",
+                  "chronicDiseaseDetails",
+            ]);
 
-            await pool.query(
-                  `UPDATE appointments SET ${setString} WHERE id = $${fields.length + 1}`,
-                  [...values, id]
-            );
+            const APPOINTMENT_ONLY_FIELDS = new Set([
+                  "dateTime",
+                  "doctorId",
+                  "testName",
+                  "price",
+                  "isRevisit",
+                  "userId",
+            ]);
 
-            res.json({ message: "success", data: { ...appointment, ...updatedData } });
+            const FORBIDDEN_FIELDS = new Set(["id", "fileNumber", "medicalCenterId", "createdAt"]);
+
+            const cleaned = {};
+            for (const [k, v] of Object.entries(updatedData)) {
+                  if (FORBIDDEN_FIELDS.has(k)) continue;
+                  cleaned[k] = v;
+            }
+
+            const patientUpdates = {};
+            const appointmentUpdates = {};
+
+            for (const [k, v] of Object.entries(cleaned)) {
+                  if (PATIENT_FIELDS.has(k)) patientUpdates[k] = v;
+                  else if (APPOINTMENT_ONLY_FIELDS.has(k)) appointmentUpdates[k] = v;
+            }
+
+            const buildUpdate = (obj, startIndex = 1) => {
+                  const fields = Object.keys(obj);
+                  const values = Object.values(obj);
+                  const setString = fields.map((f, idx) => `"${f}" = $${idx + startIndex}`).join(", ");
+                  return { fields, values, setString };
+            };
+
+            let updatedRowsCount = 0;
+
+            if (Object.keys(patientUpdates).length > 0) {
+                  const { values, setString, fields } = buildUpdate(patientUpdates, 1);
+
+                  const q = `
+        UPDATE appointments
+        SET ${setString}
+        WHERE "medicalCenterId" = $${fields.length + 1}
+          AND "fileNumber" = $${fields.length + 2}
+      `;
+
+                  const r = await pool.query(q, [...values, medicalCenterId, fileNumber]);
+                  updatedRowsCount += r.rowCount || 0;
+            }
+
+            if (Object.keys(appointmentUpdates).length > 0) {
+                  const { values, setString, fields } = buildUpdate(appointmentUpdates, 1);
+
+                  const q = `
+        UPDATE appointments
+        SET ${setString}
+        WHERE id = $${fields.length + 1}
+      `;
+
+                  await pool.query(q, [...values, id]);
+            }
+
+            const finalRes = await pool.query(`SELECT * FROM appointments WHERE id = $1`, [id]);
+
+            return res.json({
+                  message: "success",
+                  data: finalRes.rows[0],
+                  updatedPatientAppointments: updatedRowsCount,
+            });
       } catch (error) {
             console.error("❌ Error in updateAppointment:", error);
-            res.status(500).json({ message: "error", error: error.message });
+            return res.status(500).json({ message: "error", error: error.message });
       }
 };
 
@@ -537,7 +616,7 @@ const getAppointmentById = async (req, res) => {
 
             const result = await pool.query(query, [id]);
 
-            if (result.rowCount === 0) {
+            if (!result.rowCount) {
                   return res.status(404).json({ message: "الحجز غير موجود" });
             }
 
