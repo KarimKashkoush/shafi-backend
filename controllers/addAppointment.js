@@ -42,16 +42,36 @@ const addAppointment = async (req, res) => {
             const testName = req.body.testName || null;
             const doctorId = req.body.doctorId || null;
             const dateTime = req.body.dateTime || null;
-            const isRevisit = req.body.isRevisit || false;
+            const isRevisit = !!req.body.isRevisit;
 
-            // الحقول الجديدة
+            // الحقول الإضافية القديمة
             const birthDate = req.body.birthDate || null;
-            const hasChronicDisease = req.body.hasChronicDisease || false;
+            const hasChronicDisease = !!req.body.hasChronicDisease;
             const chronicDiseaseDetails = req.body.chronicDiseaseDetails || null;
-            const price = req.body.price || null;
+            const price = req.body.price ?? null;
+
+            // ✅ الحقول الجديدة (تحويل)
+            const isReferred = !!req.body.isReferred;
+            const referredFromDoctorRaw = req.body.referredFromDoctor || null;
+            const referredFromDoctor = referredFromDoctorRaw
+                  ? String(referredFromDoctorRaw).trim()
+                  : null;
+
+            // Normalize name/phone (زي ما كنت عامل)
+            const cleanName = String(caseName ?? "").trim();
+            const cleanPhone = String(phone ?? "").replace(/\s+/g, "").trim();
+
+            // ✅ لو محوّلة لازم اسم الدكتور
+            if (isReferred && !referredFromDoctor) {
+                  return res
+                        .status(400)
+                        .json({ message: "اكتب اسم الدكتور اللي محوّل الحالة" });
+            }
 
             const normalizedDateTime = dateTime ? toUtcIso(dateTime) : null;
-            const normalizedBirthDate = birthDate ? toUtcIso(birthDate, { dateOnly: true }) : null;
+            const normalizedBirthDate = birthDate
+                  ? toUtcIso(birthDate, { dateOnly: true })
+                  : null;
 
             if (dateTime && !normalizedDateTime) {
                   return res.status(400).json({ message: "تاريخ / وقت الحجز غير صالح" });
@@ -69,11 +89,7 @@ const addAppointment = async (req, res) => {
             // =========================
             let fileNumber = null;
 
-            const cleanName = String(caseName ?? "").trim();
-            const cleanPhone = String(phone ?? "").replace(/\s+/g, "").trim(); // يمنع null.replace + يشيل مسافات
-
             if (cleanName && cleanPhone) {
-                  // ✅ مقارنة قوية: trim + lower للاسم، وشيل مسافات من phone المخزن في DB
                   const existingQuery = await pool.query(
                         `
         SELECT "fileNumber"
@@ -88,16 +104,12 @@ const addAppointment = async (req, res) => {
                   );
 
                   if (existingQuery.rows.length > 0 && existingQuery.rows[0].fileNumber) {
-                        // نفس الاسم + نفس التليفون => نفس رقم الملف
                         fileNumber = existingQuery.rows[0].fileNumber;
                   } else {
-                        // تركيبة جديدة => رقم ملف جديد
                         const seqResult = await pool.query(`SELECT nextval('file_number_seq')`);
                         fileNumber = seqResult.rows[0].nextval;
                   }
-
             } else {
-                  // لو ناقص اسم أو تليفون => رقم جديد
                   const seqResult = await pool.query(`SELECT nextval('file_number_seq')`);
                   fileNumber = seqResult.rows[0].nextval;
             }
@@ -115,8 +127,9 @@ const addAppointment = async (req, res) => {
       INSERT INTO appointments 
       ("userId", "caseName", "phone", "nationalId", "testName", "doctorId",
        "medicalCenterId", "dateTime", "birthDate", "hasChronicDisease",
-       "chronicDiseaseDetails", "price", "isRevisit", "fileNumber")
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+       "chronicDiseaseDetails", "price", "isRevisit", "fileNumber",
+       "isReferred", "referredFromDoctor")
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
       RETURNING *;
     `;
 
@@ -134,7 +147,9 @@ const addAppointment = async (req, res) => {
                   chronicDiseaseDetails,
                   price,
                   isRevisit,
-                  fileNumber
+                  fileNumber,
+                  isReferred,
+                  referredFromDoctor,
             ];
 
             const result = await pool.query(query, values);
@@ -145,7 +160,6 @@ const addAppointment = async (req, res) => {
             return res.status(500).json({ message: "error", error: error.message });
       }
 };
-
 
 const addResultToAppointment = async (req, res) => {
       try {
@@ -159,7 +173,8 @@ const addResultToAppointment = async (req, res) => {
                   medicalCenterId,
                   medications,
                   radiology,
-                  labTests
+                  labTests,
+                  notes, // ✅ جديد
             } = req.body;
 
             if (!userId) {
@@ -172,6 +187,9 @@ const addResultToAppointment = async (req, res) => {
             medications = safeParseArray(medications);
             radiology = safeParseArray(radiology);
             labTests = safeParseArray(labTests);
+
+            // ✅ notes نص عادي
+            const cleanNotes = notes ? String(notes).trim() : null;
 
             // هات بيانات الحجز
             const apptRes = await pool.query(
@@ -189,27 +207,26 @@ const addResultToAppointment = async (req, res) => {
             // رفع الملفات
             let uploadedFiles = [];
             if (req.files?.length) {
-                  const uploaded = await Promise.all(req.files.map(file => uploadFileToS3(file)));
-                  uploadedFiles = uploaded.map(x => x.url); // ✅ بدون const
+                  const uploaded = await Promise.all(req.files.map((file) => uploadFileToS3(file)));
+                  uploadedFiles = uploaded.map((x) => x.url);
             }
 
-
-            // ✅ لو العمود files jsonb برضه: خزّن array
-            // uploadedFiles غالبًا array of urls
+            // ✅ INSERT مع notes
             const query = `
-  INSERT INTO "patientsReports" (
-    "appointmentId","doctorId","caseName","phone","nationalId","testName",
-    "files","report","nextAction","sessionCost","medicalCenterId",
-    "medications","radiology","labTests"
-  )
-  VALUES (
-    $1,$2,$3,$4,$5,$6,
-    $7::jsonb,$8::jsonb,$9::jsonb,$10,$11,
-    $12::jsonb,$13::jsonb,$14::jsonb
-  )
-  RETURNING *
-`;
-
+      INSERT INTO "patientsReports" (
+        "appointmentId","doctorId","caseName","phone","nationalId","testName",
+        "files","report","nextAction","sessionCost","medicalCenterId",
+        "medications","radiology","labTests",
+        "notes"
+      )
+      VALUES (
+        $1,$2,$3,$4,$5,$6,
+        $7::jsonb,$8::jsonb,$9::jsonb,$10,$11,
+        $12::jsonb,$13::jsonb,$14::jsonb,
+        $15
+      )
+      RETURNING *
+    `;
 
             const values = [
                   id,
@@ -218,24 +235,23 @@ const addResultToAppointment = async (req, res) => {
                   phone,
                   nationalId,
                   testName,
-                  JSON.stringify(uploadedFiles),   // ✅
-                  JSON.stringify(report),          // ✅
-                  JSON.stringify(nextAction),      // ✅
+                  JSON.stringify(uploadedFiles),
+                  JSON.stringify(report),
+                  JSON.stringify(nextAction),
                   Number(sessionCost) || 0,
                   medicalCenterId || null,
-                  JSON.stringify(medications),     // ✅
-                  JSON.stringify(radiology),       // ✅
-                  JSON.stringify(labTests)         // ✅
+                  JSON.stringify(medications),
+                  JSON.stringify(radiology),
+                  JSON.stringify(labTests),
+                  cleanNotes, // ✅
             ];
-
 
             const result = await pool.query(query, values);
 
             res.status(201).json({
                   message: "success",
-                  data: result.rows[0]
+                  data: result.rows[0],
             });
-
       } catch (error) {
             console.error("❌ addResultToAppointment:", error);
             res.status(500).json({ message: "error", error: error.message });
@@ -252,7 +268,8 @@ const updateResultAppointment = async (req, res) => {
                   sessionCost,
                   medications,
                   radiology,
-                  labTests
+                  labTests,
+                  notes, // ✅ جديد
             } = req.body;
 
             // ✅ Parse
@@ -262,11 +279,14 @@ const updateResultAppointment = async (req, res) => {
             radiology = safeParseArray(radiology);
             labTests = safeParseArray(labTests);
 
+            // ✅ notes نص عادي
+            const cleanNotes = notes ? String(notes).trim() : null;
+
             // الملفات الجديدة
             let newFiles = [];
             if (req.files?.length) {
-                  const uploaded = await Promise.all(req.files.map(file => uploadFileToS3(file)));
-                  newFiles = uploaded.map(x => x.url);
+                  const uploaded = await Promise.all(req.files.map((file) => uploadFileToS3(file)));
+                  newFiles = uploaded.map((x) => x.url);
             }
 
             // هات الملفات القديمة (jsonb array)
@@ -283,20 +303,20 @@ const updateResultAppointment = async (req, res) => {
             const allFiles = [...oldFiles, ...newFiles];
 
             const updateQuery = `
-  UPDATE "patientsReports"
-  SET
-    "report" = $1::jsonb,
-    "nextAction" = $2::jsonb,
-    "sessionCost" = $3,
-    "files" = $4::jsonb,
-    "medications" = $5::jsonb,
-    "radiology" = $6::jsonb,
-    "labTests" = $7::jsonb,
-    "updatedAt" = NOW()
-  WHERE id = $8 AND "appointmentId" = $9
-  RETURNING *
-`;
-
+      UPDATE "patientsReports"
+      SET
+        "report" = $1::jsonb,
+        "nextAction" = $2::jsonb,
+        "sessionCost" = $3,
+        "files" = $4::jsonb,
+        "medications" = $5::jsonb,
+        "radiology" = $6::jsonb,
+        "labTests" = $7::jsonb,
+        "notes" = $8,
+        "updatedAt" = NOW()
+      WHERE id = $9 AND "appointmentId" = $10
+      RETURNING *
+    `;
 
             const values = [
                   JSON.stringify(report),
@@ -306,23 +326,23 @@ const updateResultAppointment = async (req, res) => {
                   JSON.stringify(medications),
                   JSON.stringify(radiology),
                   JSON.stringify(labTests),
+                  cleanNotes,  // ✅
                   reportId,
-                  id
+                  id,
             ];
-
 
             const updated = await pool.query(updateQuery, values);
 
             res.json({
                   message: "updated",
-                  data: updated.rows[0]
+                  data: updated.rows[0],
             });
-
       } catch (error) {
             console.error("❌ updateResultAppointment:", error);
             res.status(500).json({ message: "error", error: error.message });
       }
 };
+
 
 const getAppointmentsWithResults = async (req, res) => {
       try {
